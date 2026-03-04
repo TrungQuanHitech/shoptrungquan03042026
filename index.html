@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SmartShop ERP & POS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            /* Tăng kích thước font cơ sở thêm 2 đơn vị theo yêu cầu */
+            --base-fs: 12px; 
+            --base-fs-desktop: 13.5px;
+            font-size: var(--base-fs);
+        }
+        @media (min-width: 640px) {
+            :root {
+                font-size: var(--base-fs-desktop);
+            }
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            line-height: 1.4;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        
+        .no-print { display: block !important; }
+        
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Animations for 'animate-in' */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInFromTop { from { transform: translateY(-1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideInFromRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes slideInFromBottom { from { transform: translateY(1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .animate-in { animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); animation-fill-mode: both; }
+        .fade-in { animation-name: fadeIn; }
+        .slide-in-from-top-1 { animation-name: slideInFromTop; }
+        .slide-in-from-top-2 { animation-name: slideInFromTop; }
+        .slide-in-from-top-4 { animation-name: slideInFromTop; }
+        .slide-in-from-bottom-4 { animation-name: slideInFromBottom; }
+        .slide-in-from-right { animation-name: slideInFromRight; }
+        .zoom-in { animation-name: zoomIn; }
+        .duration-150 { animation-duration: 150ms; }
+        .duration-200 { animation-duration: 200ms; }
+        .duration-300 { animation-duration: 300ms; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="overflow-x-hidden">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

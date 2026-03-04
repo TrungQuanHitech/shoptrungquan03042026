@@ -1,0 +1,7 @@
+{
+  "name": "SmartShop ERP & POS 18012026",
+  "description": "Hệ thống quản lý bán hàng, kho, công nợ và tài chính toàn diện, tối ưu hóa cho di động với giao diện bảng mật độ cao.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
