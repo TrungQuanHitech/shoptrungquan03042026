@@ -138,19 +138,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleSync = async () => {
-    if (!localSettings.googleScriptUrl && !localSettings.googleSheetId) {
-      alert("Vui lòng nhập URL Apps Script hoặc Kết nối Google trước khi đồng bộ.");
+    if (!localSettings.googleSheetId && !localSettings.isGoogleConnected) {
+      alert("Vui lòng thiết lập kết nối Google Client ID để sử dụng chức năng đồng bộ.");
       return;
     }
     setIsSyncing(true);
     try {
       const allData = getAllData();
-      if (localSettings.isGoogleConnected && localSettings.googleSheetId) {
-        await syncToGoogleSheetDirect(localSettings.googleSheetId, allData);
-      } else if (localSettings.googleScriptUrl) {
-        await syncToGoogleSheet(localSettings.googleScriptUrl, allData);
+      if (localSettings.isGoogleConnected && localSettings.googleAccessToken) {
+        await syncToGoogleSheetDirect(localSettings, allData);
+        alert('✅ Đồng bộ trực tiếp qua Google API thành công!');
+      } else {
+        throw new Error("Vui lòng kết nối Google trước.");
       }
-      alert('✅ Đồng bộ dữ liệu thành công! Vui lòng kiểm tra Google Sheet của bạn.');
     } catch (error: any) {
       console.error("Lỗi khi đồng bộ:", error);
       alert(`🔴 Đã xảy ra lỗi khi đồng bộ: ${error.message}`);
