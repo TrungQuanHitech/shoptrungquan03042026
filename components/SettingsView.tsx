@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, MapPin, CreditCard, Database, MessageSquare, Table, Send, CheckCircle2, XCircle, Shield, Lock, Eye, EyeOff, Copy, Check, RefreshCw, Type, Bell, Share2, Barcode, Laptop, Percent, Ruler, Link, ExternalLink, DatabaseBackup, Landmark, UserCheck, Eye as EyeIcon, Palette, LayoutTemplate, Trash2, FileJson, FolderPlus, FileSpreadsheet, LogOut } from 'lucide-react';
+import { Save, MapPin, CreditCard, Database, MessageSquare, Table, Send, CheckCircle2, XCircle, Shield, Lock, Eye, EyeOff, Copy, Check, RefreshCw, Type, Bell, Share2, Barcode, Laptop, Percent, Ruler, Link, ExternalLink, DatabaseBackup, Landmark, UserCheck, Eye as EyeIcon, Palette, LayoutTemplate, Trash2, FileJson, FolderPlus, FileSpreadsheet, LogOut, PlusSquare, FolderOpen, User, AlertTriangle } from 'lucide-react';
 import { Settings, Product, Order, Purchase, Contact, Transaction, RepairTicket, RentalContract } from '../types';
-import { syncToGoogleSheet, syncToGoogleSheetDirect } from '../src/services/googleSheetSync';
-import { signInWithGoogle, signOutGoogle } from '../src/services/googleIdentity';
+import { syncToGoogleSheet, syncToGoogleSheetDirect, createSpreadsheet, createDriveFolder, createSheetTab } from '../src/services/googleSheetSync';
+import { signInWithGoogle, signOutGoogle, getValidToken } from '../src/services/googleIdentity';
 import * as XLSX from 'xlsx';
 
 interface SettingsViewProps {
@@ -33,6 +33,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [isSettingUpGoogle, setIsSettingUpGoogle] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isCreatingSheet, setIsCreatingSheet] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isCreatingSheetTab, setIsCreatingSheetTab] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error' | 'token_expired'>('idle');
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -57,18 +61,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       const result = await signInWithGoogle(localSettings.googleClientId);
       if (result && result.accessToken) {
-        // Successful login
         const newSettings = {
           ...localSettings,
           googleAccessToken: result.accessToken,
+          googleTokenExpiry: result.tokenExpiry,
+          googleUserEmail: result.user?.email,
           isGoogleConnected: true
         };
         setLocalSettings(newSettings);
         setSettings(newSettings);
         localStorage.setItem('erp_settings', JSON.stringify(newSettings));
+        setSyncStatus('idle');
 
         if (result.user) {
-          alert(`✅ Kết nối thành công với tài khoản: ${result.user.email}`);
+          alert(`✅ Kết nối thành công!\n📧 Tài khoản: ${result.user.email}`);
         } else {
           alert(`✅ Kết nối thành công!`);
         }
@@ -87,12 +93,136 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       const newSettings = {
         ...localSettings,
         googleAccessToken: undefined,
+        googleTokenExpiry: undefined,
+        googleUserEmail: undefined,
         isGoogleConnected: false
       };
       setLocalSettings(newSettings);
       setSettings(newSettings);
       localStorage.setItem('erp_settings', JSON.stringify(newSettings));
+      setSyncStatus('idle');
       alert('Đã ngắt kết nối Google');
+    }
+  };
+
+  // Cập nhật token mới vào settings sau khi refresh
+  const handleTokenRefreshed = (newToken: string, newExpiry: number) => {
+    const updated = { ...localSettings, googleAccessToken: newToken, googleTokenExpiry: newExpiry };
+    setLocalSettings(updated);
+    setSettings(updated);
+    localStorage.setItem('erp_settings', JSON.stringify(updated));
+  };
+
+  // Tạo Google Spreadsheet mới
+  const handleCreateSpreadsheet = async () => {
+    const title = window.prompt('Nhập tên cho Spreadsheet mới:', `SmartShop ERP - ${localSettings.shopName || 'Data'}`);
+    if (!title) return;
+    if (!localSettings.googleAccessToken) {
+      alert('Vui lòng kết nối Google trước!');
+      return;
+    }
+    setIsCreatingSheet(true);
+    try {
+      // Đảm bảo token hợp lệ
+      const { accessToken, tokenExpiry, refreshed } = await getValidToken(
+        localSettings.googleAccessToken,
+        localSettings.googleTokenExpiry,
+        localSettings.googleClientId
+      );
+      if (refreshed) handleTokenRefreshed(accessToken, tokenExpiry);
+
+      const { spreadsheetId, spreadsheetUrl } = await createSpreadsheet(accessToken, title);
+      const newSettings = { ...localSettings, googleSheetId: spreadsheetId, googleAccessToken: accessToken, googleTokenExpiry: tokenExpiry };
+      setLocalSettings(newSettings);
+      setSettings(newSettings);
+      localStorage.setItem('erp_settings', JSON.stringify(newSettings));
+      alert(`✅ Đã tạo Spreadsheet mới!\n📋 Tên: ${title}\n🔗 ID: ${spreadsheetId}\n\nMở file: ${spreadsheetUrl}`);
+    } catch (error: any) {
+      console.error('Create spreadsheet error:', error);
+      if (error.message?.includes('Token') || error.message?.includes('hết hạn')) {
+        setSyncStatus('token_expired');
+        alert('⚠️ Token đã hết hạn. Vui lòng nhấn "Kết nối Google" để đăng nhập lại.');
+      } else {
+        alert(`🔴 Lỗi tạo Spreadsheet: ${error.message}`);
+      }
+    } finally {
+      setIsCreatingSheet(false);
+    }
+  };
+
+  // Tạo sheet tab mới trong spreadsheet hiện tại
+  const handleCreateSheetTab = async () => {
+    if (!localSettings.googleSheetId) {
+      alert('Vui lòng tạo hoặc nhập Google Sheet ID trước!');
+      return;
+    }
+    const tabName = window.prompt('Nhập tên cho sheet tab mới:', 'Sheet mới');
+    if (!tabName) return;
+    if (!localSettings.googleAccessToken) {
+      alert('Vui lòng kết nối Google trước!');
+      return;
+    }
+    setIsCreatingSheetTab(true);
+    try {
+      const { accessToken, tokenExpiry, refreshed } = await getValidToken(
+        localSettings.googleAccessToken,
+        localSettings.googleTokenExpiry,
+        localSettings.googleClientId
+      );
+      if (refreshed) handleTokenRefreshed(accessToken, tokenExpiry);
+
+      await createSheetTab(accessToken, localSettings.googleSheetId, tabName);
+      alert(`✅ Đã tạo sheet tab "${tabName}" thành công!`);
+    } catch (error: any) {
+      console.error('Create sheet tab error:', error);
+      if (error.message?.includes('Token') || error.message?.includes('hết hạn')) {
+        setSyncStatus('token_expired');
+        alert('⚠️ Token đã hết hạn. Vui lòng nhấn "Kết nối Google" để đăng nhập lại.');
+      } else {
+        alert(`🔴 Lỗi tạo sheet tab: ${error.message}`);
+      }
+    } finally {
+      setIsCreatingSheetTab(false);
+    }
+  };
+
+  // Tạo thư mục mới trên Google Drive
+  const handleCreateDriveFolder = async () => {
+    const folderName = window.prompt('Nhập tên thư mục Drive mới:', `SmartShop - ${localSettings.shopName || 'Files'}`);
+    if (!folderName) return;
+    if (!localSettings.googleAccessToken) {
+      alert('Vui lòng kết nối Google trước!');
+      return;
+    }
+    setIsCreatingFolder(true);
+    try {
+      const { accessToken, tokenExpiry, refreshed } = await getValidToken(
+        localSettings.googleAccessToken,
+        localSettings.googleTokenExpiry,
+        localSettings.googleClientId
+      );
+      if (refreshed) handleTokenRefreshed(accessToken, tokenExpiry);
+
+      const { folderId, folderUrl } = await createDriveFolder(
+        accessToken,
+        folderName,
+        localSettings.googleDriveFolderId || undefined
+      );
+      const newSettings = { ...localSettings, googleDriveFolderId: folderId, googleAccessToken: accessToken, googleTokenExpiry: tokenExpiry };
+      setLocalSettings(newSettings);
+      setSettings(newSettings);
+      localStorage.setItem('erp_settings', JSON.stringify(newSettings));
+      alert(`✅ Đã tạo thư mục Drive!\n📁 Tên: ${folderName}\n🔗 ID: ${folderId}\n\nMở thư mục: ${folderUrl}`);
+    } catch (error: any) {
+      console.error('Create folder error:', error);
+      if (error.message?.includes('Token') || error.message?.includes('hết hạn')) {
+        setSyncStatus('token_expired');
+        alert('⚠️ Token đã hết hạn. Vui lòng nhấn "Kết nối Google" để đăng nhập lại.');
+      } else {
+        alert(`🔴 Lỗi tạo thư mục: ${error.message}`);
+      }
+    } finally {
+      setIsCreatingFolder(false);
     }
   };
 
@@ -138,22 +268,39 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleSync = async () => {
-    if (!localSettings.googleSheetId && !localSettings.isGoogleConnected) {
-      alert("Vui lòng thiết lập kết nối Google Client ID để sử dụng chức năng đồng bộ.");
+    if (!localSettings.isGoogleConnected || !localSettings.googleAccessToken) {
+      alert("Vui lòng kết nối Google trước khi đồng bộ.");
+      return;
+    }
+    if (!localSettings.googleSheetId) {
+      alert("Vui lòng tạo hoặc nhập Google Sheet ID trước khi đồng bộ.");
       return;
     }
     setIsSyncing(true);
+    setSyncStatus('idle');
     try {
+      // Kiểm tra token hợp lệ trước khi sync
+      const { accessToken, tokenExpiry, refreshed } = await getValidToken(
+        localSettings.googleAccessToken,
+        localSettings.googleTokenExpiry,
+        localSettings.googleClientId
+      );
+      if (refreshed) handleTokenRefreshed(accessToken, tokenExpiry);
+
+      const syncSettings = { ...localSettings, googleAccessToken: accessToken };
       const allData = getAllData();
-      if (localSettings.isGoogleConnected && localSettings.googleAccessToken) {
-        await syncToGoogleSheetDirect(localSettings, allData);
-        alert('✅ Đồng bộ trực tiếp qua Google API thành công!');
-      } else {
-        throw new Error("Vui lòng kết nối Google trước.");
-      }
+      await syncToGoogleSheetDirect(syncSettings, allData, handleTokenRefreshed);
+      setSyncStatus('success');
+      alert('✅ Đồng bộ dữ liệu lên Google Sheets thành công!');
     } catch (error: any) {
       console.error("Lỗi khi đồng bộ:", error);
-      alert(`🔴 Đã xảy ra lỗi khi đồng bộ: ${error.message}`);
+      if (error.message?.includes('hết hạn') || error.message?.includes('Token') || error.message?.includes('UNAUTHENTICATED')) {
+        setSyncStatus('token_expired');
+        alert(`⚠️ Phiên đăng nhập đã hết hạn!\n\nVui lòng nhấn "Kết nối Google" để đăng nhập lại rồi thử đồng bộ lại.`);
+      } else {
+        setSyncStatus('error');
+        alert(`🔴 Lỗi đồng bộ: ${error.message}`);
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -397,7 +544,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="flex items-center gap-4">
               {localSettings.isGoogleConnected && (
                 <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">{localSettings.autoSync ? 'Tự động đồng bộ: Bật' : 'Tự động đồng bộ: Tắt'}</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">{localSettings.autoSync ? 'Tự động: Bật' : 'Tự động: Tắt'}</span>
                   <button
                     type="button"
                     onClick={() => setLocalSettings({ ...localSettings, autoSync: !localSettings.autoSync })}
@@ -408,9 +555,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               )}
               {localSettings.isGoogleConnected ? (
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1">
-                  <CheckCircle2 size={12} /> Đã kết nối
-                </span>
+                <div className="flex items-center gap-2">
+                  {localSettings.googleUserEmail && (
+                    <span className="hidden sm:flex items-center gap-1 px-2 py-1 bg-slate-50 rounded-lg text-[10px] text-slate-500 font-medium">
+                      <User size={10} /> {localSettings.googleUserEmail}
+                    </span>
+                  )}
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Đã kết nối
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleGoogleDisconnect}
+                    className="px-2 py-1 bg-rose-50 text-rose-500 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 hover:bg-rose-100 transition-all"
+                    title="Ngắt kết nối"
+                  >
+                    <LogOut size={10} />
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -425,56 +587,155 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
+          {/* Cảnh báo token hết hạn */}
+          {syncStatus === 'token_expired' && (
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs font-bold text-amber-700">Phiên đăng nhập đã hết hạn</p>
+                <p className="text-[10px] text-amber-600">Vui lòng nhấn "Kết nối Google" để làm mới phiên đăng nhập.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleGoogleConnect}
+                disabled={isConnectingGoogle}
+                className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-[10px] font-bold whitespace-nowrap hover:bg-amber-600 transition-all"
+              >
+                {isConnectingGoogle ? <RefreshCw size={10} className="animate-spin" /> : 'Đăng nhập lại'}
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5 col-span-1 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Google Client ID (Tùy chọn)</label>
-              <input value={localSettings.googleClientId || ''} onChange={e => setLocalSettings({ ...localSettings, googleClientId: e.target.value })} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none" placeholder="Nhập Client ID của bạn (nếu có)" />
+              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Google Client ID</label>
+              <input value={localSettings.googleClientId || ''} onChange={e => setLocalSettings({ ...localSettings, googleClientId: e.target.value })} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Nhập Client ID của bạn" />
             </div>
             <div className="space-y-1.5 col-span-1 md:col-span-2">
-              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Google Client Secret (Tùy chọn)</label>
+              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Google Client Secret</label>
               <div className="relative">
                 <input
                   type="password"
                   value={localSettings.googleClientSecret || ''}
                   onChange={e => setLocalSettings({ ...localSettings, googleClientSecret: e.target.value })}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none pr-10"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none pr-10 focus:ring-2 focus:ring-indigo-100"
                   placeholder="Nhập Client Secret của bạn"
                 />
                 <Lock className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
               </div>
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-2">
-              <div className="flex items-center gap-2 text-emerald-600">
-                <FileSpreadsheet size={16} />
-                <span className="text-[10px] font-bold uppercase">Google Sheet ID</span>
+
+            {/* Google Sheet ID - có thể chỉnh sửa */}
+            <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <FileSpreadsheet size={16} />
+                  <span className="text-[10px] font-bold uppercase">Google Sheet ID</span>
+                </div>
+                {localSettings.isGoogleConnected && (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={handleCreateSpreadsheet}
+                      disabled={isCreatingSheet}
+                      className="flex items-center gap-1 px-2 py-1 bg-emerald-600 text-white rounded-lg text-[9px] font-bold uppercase hover:bg-emerald-700 transition-all disabled:opacity-50"
+                      title="Tạo Spreadsheet mới"
+                    >
+                      {isCreatingSheet ? <RefreshCw size={9} className="animate-spin" /> : <PlusSquare size={9} />}
+                      Tạo mới
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateSheetTab}
+                      disabled={isCreatingSheetTab || !localSettings.googleSheetId}
+                      className="flex items-center gap-1 px-2 py-1 bg-blue-500 text-white rounded-lg text-[9px] font-bold uppercase hover:bg-blue-600 transition-all disabled:opacity-50"
+                      title="Thêm sheet tab mới vào spreadsheet hiện tại"
+                    >
+                      {isCreatingSheetTab ? <RefreshCw size={9} className="animate-spin" /> : <Table size={9} />}
+                      Thêm tab
+                    </button>
+                  </div>
+                )}
               </div>
               <input
-                readOnly
-                value={localSettings.googleSheetId || 'Chưa thiết lập'}
-                className="bg-transparent text-xs font-mono text-slate-500 outline-none"
+                value={localSettings.googleSheetId || ''}
+                onChange={e => setLocalSettings({ ...localSettings, googleSheetId: e.target.value })}
+                className="bg-white border border-emerald-100 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-600 outline-none focus:ring-2 focus:ring-emerald-200 w-full"
+                placeholder="Nhập hoặc tạo Sheet ID..."
               />
+              {localSettings.googleSheetId && (
+                <a
+                  href={`https://docs.google.com/spreadsheets/d/${localSettings.googleSheetId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] text-emerald-600 font-bold flex items-center gap-1 hover:underline"
+                >
+                  <ExternalLink size={9} /> Mở trên Google Sheets
+                </a>
+              )}
             </div>
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-2">
-              <div className="flex items-center gap-2 text-amber-600">
-                <FolderPlus size={16} />
-                <span className="text-[10px] font-bold uppercase">Drive Folder ID</span>
+
+            {/* Drive Folder ID */}
+            <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <FolderPlus size={16} />
+                  <span className="text-[10px] font-bold uppercase">Drive Folder ID</span>
+                </div>
+                {localSettings.isGoogleConnected && (
+                  <button
+                    type="button"
+                    onClick={handleCreateDriveFolder}
+                    disabled={isCreatingFolder}
+                    className="flex items-center gap-1 px-2 py-1 bg-amber-500 text-white rounded-lg text-[9px] font-bold uppercase hover:bg-amber-600 transition-all disabled:opacity-50"
+                    title="Tạo thư mục Drive mới"
+                  >
+                    {isCreatingFolder ? <RefreshCw size={9} className="animate-spin" /> : <FolderOpen size={9} />}
+                    Tạo thư mục
+                  </button>
+                )}
               </div>
               <input
-                readOnly
-                value={localSettings.googleDriveFolderId || 'Chưa thiết lập'}
-                className="bg-transparent text-xs font-mono text-slate-500 outline-none"
+                value={localSettings.googleDriveFolderId || ''}
+                onChange={e => setLocalSettings({ ...localSettings, googleDriveFolderId: e.target.value })}
+                className="bg-white border border-amber-100 rounded-lg px-2 py-1.5 text-xs font-mono text-slate-600 outline-none focus:ring-2 focus:ring-amber-200 w-full"
+                placeholder="Nhập hoặc tạo Folder ID..."
               />
+              {localSettings.googleDriveFolderId && (
+                <a
+                  href={`https://drive.google.com/drive/folders/${localSettings.googleDriveFolderId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] text-amber-600 font-bold flex items-center gap-1 hover:underline"
+                >
+                  <ExternalLink size={9} /> Mở trên Google Drive
+                </a>
+              )}
             </div>
           </div>
 
           {localSettings.isGoogleConnected && (
-            <button type="button" disabled={isSyncing} onClick={handleSync} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 text-[0.8rem] shadow-lg active:scale-95 transition-all disabled:bg-slate-300">
-              <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} /> {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ dữ liệu ngay'}
+            <button
+              type="button"
+              disabled={isSyncing}
+              onClick={handleSync}
+              className={`w-full py-3 text-white rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 text-[0.8rem] shadow-lg active:scale-95 transition-all disabled:bg-slate-300 ${syncStatus === 'success' ? 'bg-emerald-500' :
+                  syncStatus === 'error' ? 'bg-rose-500' :
+                    syncStatus === 'token_expired' ? 'bg-amber-500' :
+                      'bg-emerald-600'
+                }`}
+            >
+              <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+              {isSyncing ? 'Đang đồng bộ...' :
+                syncStatus === 'success' ? '✅ Đã đồng bộ thành công!' :
+                  syncStatus === 'token_expired' ? '⚠️ Token hết hạn - Đăng nhập lại' :
+                    syncStatus === 'error' ? '🔴 Lỗi - Thử lại' :
+                      'Đồng bộ dữ liệu ngay'}
             </button>
           )}
 
           <p className="text-[10px] text-slate-400 italic">
-            * Nhấn "Kết nối Google" để hệ thống tự động tạo File Sheet đồng bộ và Thư mục lưu trữ hình ảnh sản phẩm trên Drive của bạn.
+            💡 Nhấn "Tạo mới" để tạo Spreadsheet (với đầy đủ 6 sheet tab). Nhấn "Thêm tab" để tạo sheet tab bổ sung trong file hiện tại.
           </p>
         </div>
 

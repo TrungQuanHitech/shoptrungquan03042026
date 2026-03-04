@@ -1,5 +1,6 @@
 
 import { Product, Order, Purchase, Transaction, Contact, RepairTicket, RentalContract, Settings } from '../../types';
+import { getValidToken } from './googleIdentity';
 
 interface SyncData {
   products: Product[];
@@ -11,7 +12,165 @@ interface SyncData {
   rentalContracts: RentalContract[];
 }
 
-// Hàm để chuyển đổi object thành một hàng trong sheet, dựa vào headers
+// ===== Helper: gọi API với retry khi 401 =====
+const apiFetch = async (
+  url: string,
+  options: RequestInit,
+  settings: Settings,
+  onTokenRefreshed?: (newToken: string, newExpiry: number) => void
+): Promise<Response> => {
+  let response = await fetch(url, options);
+
+  if (response.status === 401 && settings.googleClientId) {
+    // Token hết hạn - thử refresh
+    try {
+      const refreshed = await getValidToken(undefined, undefined, settings.googleClientId);
+      if (onTokenRefreshed) {
+        onTokenRefreshed(refreshed.accessToken, refreshed.tokenExpiry);
+      }
+      // Retry với token mới
+      const newOptions: RequestInit = {
+        ...options,
+        headers: {
+          ...(options.headers as Record<string, string>),
+          'Authorization': `Bearer ${refreshed.accessToken}`,
+        }
+      };
+      response = await fetch(url, newOptions);
+    } catch (refreshError) {
+      throw new Error('Token đã hết hạn. Vui lòng nhấn "Kết nối Google" để đăng nhập lại.');
+    }
+  }
+
+  return response;
+};
+
+// ===== Tạo Google Spreadsheet mới =====
+export const createSpreadsheet = async (
+  token: string,
+  title: string
+): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> => {
+  const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      properties: { title },
+      sheets: [
+        { properties: { title: 'PRODUCTS', index: 0 } },
+        { properties: { title: 'SALES', index: 1 } },
+        { properties: { title: 'PURCHASES', index: 2 } },
+        { properties: { title: 'CONTACTS', index: 3 } },
+        { properties: { title: 'CASHFLOW', index: 4 } },
+        { properties: { title: 'SERVICES', index: 5 } },
+      ]
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Không thể tạo Spreadsheet: ${errorText}`);
+  }
+  const data = await response.json();
+  return {
+    spreadsheetId: data.spreadsheetId,
+    spreadsheetUrl: data.spreadsheetUrl,
+  };
+};
+
+// ===== Tạo thư mục mới trên Google Drive =====
+export const createDriveFolder = async (
+  token: string,
+  folderName: string,
+  parentFolderId?: string
+): Promise<{ folderId: string; folderUrl: string }> => {
+  const metadata: any = {
+    name: folderName,
+    mimeType: 'application/vnd.google-apps.folder',
+  };
+  if (parentFolderId) {
+    metadata.parents = [parentFolderId];
+  }
+
+  const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(metadata),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Không thể tạo thư mục Drive: ${errorText}`);
+  }
+  const data = await response.json();
+  return {
+    folderId: data.id,
+    folderUrl: `https://drive.google.com/drive/folders/${data.id}`,
+  };
+};
+
+// ===== Tạo sheet tab mới trong spreadsheet =====
+export const createSheetTab = async (
+  token: string,
+  spreadsheetId: string,
+  sheetTitle: string
+): Promise<void> => {
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requests: [{
+          addSheet: {
+            properties: { title: sheetTitle }
+          }
+        }]
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Không thể tạo sheet tab: ${errorText}`);
+  }
+};
+
+// ===== Kiểm tra và tạo các sheet tab cần thiết =====
+const ensureSheetsExist = async (
+  token: string,
+  spreadsheetId: string,
+  requiredSheets: string[]
+): Promise<void> => {
+  // Lấy danh sách sheet hiện có
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`,
+    {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }
+  );
+  if (!res.ok) return; // Bỏ qua nếu không đọc được
+
+  const data = await res.json();
+  const existingSheets: string[] = (data.sheets || []).map((s: any) => s.properties.title);
+
+  // Tạo các sheet còn thiếu
+  for (const sheetName of requiredSheets) {
+    if (!existingSheets.includes(sheetName)) {
+      await createSheetTab(token, spreadsheetId, sheetName);
+    }
+  }
+};
+
+// ===== Hàm gốc qua Apps Script (giữ nguyên để tương thích) =====
 const objectToRow = (obj: any, headers: string[]) => {
   return headers.map(header => {
     const value = obj[header] || '';
@@ -27,7 +186,6 @@ export const syncToGoogleSheet = async (scriptUrl: string, data: SyncData) => {
     throw new Error("URL của Google Apps Script chưa được cấu hình.");
   }
 
-  // Define headers for each sheet
   const headers = {
     products: ['id', 'name', 'sku', 'stock', 'cost', 'price', 'category', 'description', 'specifications'],
     orders: ['id', 'date', 'customerId', 'total', 'paid', 'debt', 'taxRate', 'taxAmount', 'items'],
@@ -38,7 +196,6 @@ export const syncToGoogleSheet = async (scriptUrl: string, data: SyncData) => {
     rentalContracts: ['id', 'customerId', 'machineName', 'model', 'startDate', 'rentalPrice', 'freeCopiesLimit', 'currentCounter', 'pricePerPage', 'lastBillDate']
   };
 
-  // Prepare data payload
   const payload = {
     Sản_phẩm: [headers.products, ...data.products.map(p => objectToRow(p, headers.products))],
     Đơn_bán_hàng: [headers.orders, ...data.orders.map(o => {
@@ -61,28 +218,29 @@ export const syncToGoogleSheet = async (scriptUrl: string, data: SyncData) => {
     })],
   };
 
-  const response = await fetch(scriptUrl, {
+  await fetch(scriptUrl, {
     method: 'POST',
-    mode: 'no-cors', // Important for Google Apps Script web apps
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 
-  // Note: With no-cors, we can't read the response, but the request is sent.
-  // We assume success if no network error is thrown.
   return { success: true };
 };
 
-export const syncToGoogleSheetDirect = async (settings: Settings, data: SyncData) => {
-  const token = settings.googleAccessToken;
-  if (!token) throw new Error("Chưa kết nối Google Identity Services.");
+// ===== Đồng bộ trực tiếp qua Google Sheets API (với auto-retry 401) =====
+export const syncToGoogleSheetDirect = async (
+  settings: Settings,
+  data: SyncData,
+  onTokenRefreshed?: (newToken: string, newExpiry: number) => void
+) => {
+  let token = settings.googleAccessToken;
+  if (!token) throw new Error("Chưa kết nối Google. Vui lòng nhấn 'Kết nối Google'.");
 
   const spreadsheetId = settings.googleSheetId;
-  if (!spreadsheetId) throw new Error("Vui lòng nhập Google Sheet ID.");
+  if (!spreadsheetId) throw new Error("Vui lòng tạo hoặc nhập Google Sheet ID.");
 
-  const headers = {
+  const sheetHeaders = {
     PRODUCTS: ['MÃ SP', 'TÊN SẢN PHẨM', 'DANH MỤC', 'SKU', 'GIÁ VỐN', 'GIÁ BÁN', 'TỒN KHO', 'GIÁ TRỊ TỒN', 'MÔ TẢ'],
     SALES: ['MÃ ĐƠN', 'NGÀY', 'KHÁCH HÀNG', 'TỔNG CỘNG', 'ĐÃ THANH TOÁN', 'CÒN NỢ', 'THUẾ', 'CHI TIẾT'],
     PURCHASES: ['MÃ NHẬP', 'NGÀY', 'NHÀ CUNG CẤP', 'TỔNG CỘNG', 'ĐÃ THANH TOÁN', 'CÒN NỢ', 'THUẾ', 'CHI TIẾT'],
@@ -91,25 +249,32 @@ export const syncToGoogleSheetDirect = async (settings: Settings, data: SyncData
     SERVICES: ['MÃ DV', 'LOẠI', 'KHÁCH HÀNG', 'THIẾT BỊ/MÁY', 'TRẠNG THÁI', 'CHI PHÍ/GIÁ THUÊ', 'GHI CHÚ']
   };
 
-  const payload = {
-    PRODUCTS: [headers.PRODUCTS, ...data.products.map(p => [
+  // Đảm bảo các sheet tab tồn tại trước khi ghi
+  try {
+    await ensureSheetsExist(token, spreadsheetId, Object.keys(sheetHeaders));
+  } catch (_) {
+    // Bỏ qua lỗi kiểm tra sheet - thử ghi trực tiếp
+  }
+
+  const payload: Record<string, any[][]> = {
+    PRODUCTS: [sheetHeaders.PRODUCTS, ...data.products.map(p => [
       p.id, p.name, p.category, p.sku, p.cost, p.price, p.stock, p.cost * p.stock, p.description
     ])],
-    SALES: [headers.SALES, ...data.orders.map(o => {
+    SALES: [sheetHeaders.SALES, ...data.orders.map(o => {
       const customer = data.contacts.find(c => c.id === o.customerId);
       return [o.id, o.date, customer ? customer.name : o.customerId, o.total, o.paid, o.debt, o.taxAmount, JSON.stringify(o.items)];
     })],
-    PURCHASES: [headers.PURCHASES, ...data.purchases.map(p => {
+    PURCHASES: [sheetHeaders.PURCHASES, ...data.purchases.map(p => {
       const supplier = data.contacts.find(c => c.id === p.supplierId);
       return [p.id, p.date, supplier ? supplier.name : p.supplierId, p.total, p.paid, p.debt, p.taxAmount, JSON.stringify(p.items)];
     })],
-    CONTACTS: [headers.CONTACTS, ...data.contacts.map(c => [
+    CONTACTS: [sheetHeaders.CONTACTS, ...data.contacts.map(c => [
       c.id, c.name, c.phone, c.type, c.debt
     ])],
-    CASHFLOW: [headers.CASHFLOW, ...data.transactions.map(t => [
+    CASHFLOW: [sheetHeaders.CASHFLOW, ...data.transactions.map(t => [
       t.id, t.date, t.type, t.amount, t.description, t.category, t.relatedId
     ])],
-    SERVICES: [headers.SERVICES,
+    SERVICES: [sheetHeaders.SERVICES,
     ...data.repairTickets.map(t => {
       const customer = data.contacts.find(c => c.id === t.customerId);
       return [t.id, 'SỬA CHỮA', customer ? customer.name : t.customerId, t.deviceName, t.status, t.estimatedCost, t.issueDescription];
@@ -121,24 +286,26 @@ export const syncToGoogleSheetDirect = async (settings: Settings, data: SyncData
     ]
   };
 
-  // Build the batch update request for Google Sheets API
-  const requests = Object.entries(payload).map(([sheetName, rows]) => {
-    return fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1?valueInputOption=USER_ENTERED`, {
+  // Gửi từng sheet - với retry 401
+  for (const [sheetName, rows] of Object.entries(payload)) {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1?valueInputOption=USER_ENTERED`;
+    const options: RequestInit = {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ values: rows, majorDimension: 'ROWS' })
+      body: JSON.stringify({ values: rows, majorDimension: 'ROWS' }),
+    };
+
+    const response = await apiFetch(url, options, settings, (newToken, newExpiry) => {
+      token = newToken; // Cập nhật token cho các request tiếp theo
+      if (onTokenRefreshed) onTokenRefreshed(newToken, newExpiry);
     });
-  });
 
-  const responses = await Promise.all(requests);
-
-  for (const response of responses) {
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Google API Error: ${errorText}`);
+      throw new Error(`Google API Error (${sheetName}): ${errorText}`);
     }
   }
 

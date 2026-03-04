@@ -126,6 +126,8 @@ export interface Settings {
   googleClientId?: string;
   googleClientSecret?: string;
   googleAccessToken?: string;
+  googleUserEmail?: string;
+  googleTokenExpiry?: number; // Unix timestamp (ms) khi token hết hạn
 }
 
 export type View = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'PURCHASES' | 'SERVICES' | 'FINANCE' | 'CONTACTS' | 'DEBT' | 'REPORTS' | 'SETTINGS';
