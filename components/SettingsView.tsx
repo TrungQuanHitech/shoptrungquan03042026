@@ -56,7 +56,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const handleGoogleConnect = async () => {
     setIsConnectingGoogle(true);
     try {
+      const originStr = window.location.origin;
       const params = new URLSearchParams();
+      params.append('origin', originStr);
       if (localSettings.googleClientId) params.append('clientId', localSettings.googleClientId);
       if (localSettings.googleClientSecret) params.append('clientSecret', localSettings.googleClientSecret);
 
