@@ -1,5 +1,5 @@
 
-import { Product, Order, Purchase, Transaction, Contact, RepairTicket, RentalContract } from '../../types';
+import { Product, Order, Purchase, Transaction, Contact, RepairTicket, RentalContract, Settings } from '../../types';
 
 interface SyncData {
   products: Product[];
@@ -13,13 +13,13 @@ interface SyncData {
 
 // Hàm để chuyển đổi object thành một hàng trong sheet, dựa vào headers
 const objectToRow = (obj: any, headers: string[]) => {
-    return headers.map(header => {
-        const value = obj[header] || '';
-        if (typeof value === 'object' && value !== null) {
-            return JSON.stringify(value);
-        }
-        return value;
-    });
+  return headers.map(header => {
+    const value = obj[header] || '';
+    if (typeof value === 'object' && value !== null) {
+      return JSON.stringify(value);
+    }
+    return value;
+  });
 };
 
 export const syncToGoogleSheet = async (scriptUrl: string, data: SyncData) => {
@@ -42,22 +42,22 @@ export const syncToGoogleSheet = async (scriptUrl: string, data: SyncData) => {
   const payload = {
     Sản_phẩm: [headers.products, ...data.products.map(p => objectToRow(p, headers.products))],
     Đơn_bán_hàng: [headers.orders, ...data.orders.map(o => {
-        const customer = data.contacts.find(c => c.id === o.customerId);
-        return objectToRow({ ...o, customerId: customer ? customer.name : o.customerId }, headers.orders);
+      const customer = data.contacts.find(c => c.id === o.customerId);
+      return objectToRow({ ...o, customerId: customer ? customer.name : o.customerId }, headers.orders);
     })],
     Đơn_nhập_hàng: [headers.purchases, ...data.purchases.map(p => {
-        const supplier = data.contacts.find(c => c.id === p.supplierId);
-        return objectToRow({ ...p, supplierId: supplier ? supplier.name : p.supplierId }, headers.purchases);
+      const supplier = data.contacts.find(c => c.id === p.supplierId);
+      return objectToRow({ ...p, supplierId: supplier ? supplier.name : p.supplierId }, headers.purchases);
     })],
     Đối_tác: [headers.contacts, ...data.contacts.map(c => objectToRow(c, headers.contacts))],
     Sổ_quỹ: [headers.transactions, ...data.transactions.map(t => objectToRow(t, headers.transactions))],
     Sửa_chữa: [headers.repairTickets, ...data.repairTickets.map(t => {
-        const customer = data.contacts.find(c => c.id === t.customerId);
-        return objectToRow({ ...t, customerId: customer ? customer.name : t.customerId }, headers.repairTickets);
+      const customer = data.contacts.find(c => c.id === t.customerId);
+      return objectToRow({ ...t, customerId: customer ? customer.name : t.customerId }, headers.repairTickets);
     })],
     Cho_thuê: [headers.rentalContracts, ...data.rentalContracts.map(c => {
-        const customer = data.contacts.find(con => con.id === c.customerId);
-        return objectToRow({ ...c, customerId: customer ? customer.name : c.customerId }, headers.rentalContracts);
+      const customer = data.contacts.find(con => con.id === c.customerId);
+      return objectToRow({ ...c, customerId: customer ? customer.name : c.customerId }, headers.rentalContracts);
     })],
   };
 
@@ -75,10 +75,12 @@ export const syncToGoogleSheet = async (scriptUrl: string, data: SyncData) => {
   return { success: true };
 };
 
-export const syncToGoogleSheetDirect = async (spreadsheetId: string, data: SyncData) => {
-  const tokensStr = localStorage.getItem('google_tokens');
-  if (!tokensStr) throw new Error("Chưa kết nối Google.");
-  const tokens = JSON.parse(tokensStr);
+export const syncToGoogleSheetDirect = async (settings: Settings, data: SyncData) => {
+  const token = settings.googleAccessToken;
+  if (!token) throw new Error("Chưa kết nối Google Identity Services.");
+
+  const spreadsheetId = settings.googleSheetId;
+  if (!spreadsheetId) throw new Error("Vui lòng nhập Google Sheet ID.");
 
   const headers = {
     PRODUCTS: ['MÃ SP', 'TÊN SẢN PHẨM', 'DANH MỤC', 'SKU', 'GIÁ VỐN', 'GIÁ BÁN', 'TỒN KHO', 'GIÁ TRỊ TỒN', 'MÔ TẢ'],
@@ -94,12 +96,12 @@ export const syncToGoogleSheetDirect = async (spreadsheetId: string, data: SyncD
       p.id, p.name, p.category, p.sku, p.cost, p.price, p.stock, p.cost * p.stock, p.description
     ])],
     SALES: [headers.SALES, ...data.orders.map(o => {
-        const customer = data.contacts.find(c => c.id === o.customerId);
-        return [o.id, o.date, customer ? customer.name : o.customerId, o.total, o.paid, o.debt, o.taxAmount, JSON.stringify(o.items)];
+      const customer = data.contacts.find(c => c.id === o.customerId);
+      return [o.id, o.date, customer ? customer.name : o.customerId, o.total, o.paid, o.debt, o.taxAmount, JSON.stringify(o.items)];
     })],
     PURCHASES: [headers.PURCHASES, ...data.purchases.map(p => {
-        const supplier = data.contacts.find(c => c.id === p.supplierId);
-        return [p.id, p.date, supplier ? supplier.name : p.supplierId, p.total, p.paid, p.debt, p.taxAmount, JSON.stringify(p.items)];
+      const supplier = data.contacts.find(c => c.id === p.supplierId);
+      return [p.id, p.date, supplier ? supplier.name : p.supplierId, p.total, p.paid, p.debt, p.taxAmount, JSON.stringify(p.items)];
     })],
     CONTACTS: [headers.CONTACTS, ...data.contacts.map(c => [
       c.id, c.name, c.phone, c.type, c.debt
@@ -107,28 +109,38 @@ export const syncToGoogleSheetDirect = async (spreadsheetId: string, data: SyncD
     CASHFLOW: [headers.CASHFLOW, ...data.transactions.map(t => [
       t.id, t.date, t.type, t.amount, t.description, t.category, t.relatedId
     ])],
-    SERVICES: [headers.SERVICES, 
-      ...data.repairTickets.map(t => {
-        const customer = data.contacts.find(c => c.id === t.customerId);
-        return [t.id, 'SỬA CHỮA', customer ? customer.name : t.customerId, t.deviceName, t.status, t.estimatedCost, t.issueDescription];
-      }),
-      ...data.rentalContracts.map(c => {
-        const customer = data.contacts.find(con => con.id === c.customerId);
-        return [c.id, 'CHO THUÊ', customer ? customer.name : c.customerId, c.machineName, 'ĐANG THUÊ', c.rentalPrice, c.model];
-      })
+    SERVICES: [headers.SERVICES,
+    ...data.repairTickets.map(t => {
+      const customer = data.contacts.find(c => c.id === t.customerId);
+      return [t.id, 'SỬA CHỮA', customer ? customer.name : t.customerId, t.deviceName, t.status, t.estimatedCost, t.issueDescription];
+    }),
+    ...data.rentalContracts.map(c => {
+      const customer = data.contacts.find(con => con.id === c.customerId);
+      return [c.id, 'CHO THUÊ', customer ? customer.name : c.customerId, c.machineName, 'ĐANG THUÊ', c.rentalPrice, c.model];
+    })
     ]
   };
 
-  const response = await fetch('/api/google/sync', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tokens, spreadsheetId, data: payload }),
+  // Build the batch update request for Google Sheets API
+  const requests = Object.entries(payload).map(([sheetName, rows]) => {
+    return fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1?valueInputOption=USER_ENTERED`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ values: rows, majorDimension: 'ROWS' })
+    });
   });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Lỗi đồng bộ.");
+  const responses = await Promise.all(requests);
+
+  for (const response of responses) {
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Google API Error: ${errorText}`);
+    }
   }
 
-  return await response.json();
+  return { success: true };
 };

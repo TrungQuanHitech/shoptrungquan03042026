@@ -125,6 +125,7 @@ export interface Settings {
   autoSync: boolean;
   googleClientId?: string;
   googleClientSecret?: string;
+  googleAccessToken?: string;
 }
 
 export type View = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'PURCHASES' | 'SERVICES' | 'FINANCE' | 'CONTACTS' | 'DEBT' | 'REPORTS' | 'SETTINGS';

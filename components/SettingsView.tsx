@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, MapPin, CreditCard, Database, MessageSquare, Table, Send, CheckCircle2, XCircle, Shield, Lock, Eye, EyeOff, Copy, Check, RefreshCw, Type, Bell, Share2, Barcode, Laptop, Percent, Ruler, Link, ExternalLink, DatabaseBackup, Landmark, UserCheck, Eye as EyeIcon, Palette, LayoutTemplate, Trash2, FileJson, FolderPlus, FileSpreadsheet } from 'lucide-react';
+import { Save, MapPin, CreditCard, Database, MessageSquare, Table, Send, CheckCircle2, XCircle, Shield, Lock, Eye, EyeOff, Copy, Check, RefreshCw, Type, Bell, Share2, Barcode, Laptop, Percent, Ruler, Link, ExternalLink, DatabaseBackup, Landmark, UserCheck, Eye as EyeIcon, Palette, LayoutTemplate, Trash2, FileJson, FolderPlus, FileSpreadsheet, LogOut } from 'lucide-react';
 import { Settings, Product, Order, Purchase, Contact, Transaction, RepairTicket, RentalContract } from '../types';
 import { syncToGoogleSheet, syncToGoogleSheetDirect } from '../src/services/googleSheetSync';
+import { signInWithGoogle, signOutGoogle } from '../src/services/googleIdentity';
 import * as XLSX from 'xlsx';
 
 interface SettingsViewProps {
@@ -43,63 +44,55 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   }, [localSettings]);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
-        const tokens = event.data.tokens;
-        handleGoogleSetup(tokens);
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [localSettings.shopName]);
+    setIsSaved(false);
+  }, [localSettings]);
 
   const handleGoogleConnect = async () => {
+    if (!localSettings.googleClientId) {
+      alert("⚠️ Vui lòng nhập Google Client ID trước khi kết nối!");
+      return;
+    }
+
     setIsConnectingGoogle(true);
     try {
-      const originStr = window.location.origin;
-      const params = new URLSearchParams();
-      params.append('origin', originStr);
-      if (localSettings.googleClientId) params.append('clientId', localSettings.googleClientId);
-      if (localSettings.googleClientSecret) params.append('clientSecret', localSettings.googleClientSecret);
-
-      const response = await fetch(`/api/auth/google/url?${params.toString()}`);
-      const { url } = await response.json();
-      window.open(url, 'google_auth', 'width=600,height=700');
-    } catch (error) {
-      console.error("Auth error:", error);
-      alert("Không thể kết nối với Google.");
-    } finally {
-      setIsConnectingGoogle(false);
-    }
-  };
-
-  const handleGoogleSetup = async (tokens: any) => {
-    setIsSettingUpGoogle(true);
-    try {
-      const response = await fetch('/api/google/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tokens, shopName: localSettings.shopName })
-      });
-      const data = await response.json();
-      if (data.spreadsheetId && data.folderId) {
+      const result = await signInWithGoogle(localSettings.googleClientId);
+      if (result && result.accessToken) {
+        // Successful login
         const newSettings = {
           ...localSettings,
-          googleSheetId: data.spreadsheetId,
-          googleDriveFolderId: data.folderId,
+          googleAccessToken: result.accessToken,
           isGoogleConnected: true
         };
         setLocalSettings(newSettings);
         setSettings(newSettings);
         localStorage.setItem('erp_settings', JSON.stringify(newSettings));
-        localStorage.setItem('google_tokens', JSON.stringify(tokens));
-        alert("✅ Đã tự động tạo Google Sheet và Thư mục ảnh thành công!");
+
+        if (result.user) {
+          alert(`✅ Kết nối thành công với tài khoản: ${result.user.email}`);
+        } else {
+          alert(`✅ Kết nối thành công!`);
+        }
       }
-    } catch (error) {
-      console.error("Setup error:", error);
-      alert("Lỗi khi thiết lập Google.");
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      alert(`Không thể kết nối với Google: ${error.message}`);
     } finally {
-      setIsSettingUpGoogle(false);
+      setIsConnectingGoogle(false);
+    }
+  };
+
+  const handleGoogleDisconnect = () => {
+    if (window.confirm('Bạn có chắc chắn muốn ngắt kết nối Google?')) {
+      signOutGoogle(localSettings.googleAccessToken);
+      const newSettings = {
+        ...localSettings,
+        googleAccessToken: undefined,
+        isGoogleConnected: false
+      };
+      setLocalSettings(newSettings);
+      setSettings(newSettings);
+      localStorage.setItem('erp_settings', JSON.stringify(newSettings));
+      alert('Đã ngắt kết nối Google');
     }
   };
 
@@ -226,11 +219,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         }
 
         // Auto sync if enabled
-        if (localSettings.isGoogleConnected && localSettings.googleSheetId) {
+        if (localSettings.isGoogleConnected && localSettings.googleAccessToken) {
           setIsSyncing(true);
           try {
             const allData = getAllData();
-            await syncToGoogleSheetDirect(localSettings.googleSheetId, allData);
+            await syncToGoogleSheetDirect(localSettings, allData);
             alert("✅ Đã đồng bộ xong!");
           } catch (syncErr) {
             console.error("Auto-sync after import failed:", syncErr);
