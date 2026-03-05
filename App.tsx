@@ -40,15 +40,20 @@ const INITIAL_SETTINGS: Settings = {
   themeColor: 'indigo',
   fontFamily: 'Inter',
   layoutDensity: 'COMFORTABLE',
-  telegramBotToken: "7563947270:AAFg0F9Azzkz11vUrMSXe5e-6jEs7jTuEac",
-  telegramChatId: "5055102766",
-  groqApiKey: "",
+  telegramBotToken: import.meta.env.VITE_TELEGRAM_TOKEN || "",
+  telegramChatId: import.meta.env.VITE_TELEGRAM_CHAT_ID || "",
+  groqApiKey: import.meta.env.VITE_GROQ_API_KEY || "",
   notifyOnSale: true,
   notifyOnPurchase: true,
   notifyOnFinance: true,
   googleSheetId: "1y5al0bzBLv37CsuFMrDuNFgGI83GeALAA-9O5L9xt90",
   googleScriptUrl: "https://script.google.com/macros/s/AKfycby6Ui7rHvPqzQjWzfp7sDeZnTCuw-eiPuFFWAiMhkD1os_GqmIqssClClBKsPV_nzVe/exec",
-  autoSync: true
+  googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || "",
+  autoSync: true,
+  // Supabase Cloud Database - Tự động kết nối trên mọi thiết bị
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL || "",
+  supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+  isSupabaseConnected: !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY),
 };
 
 const COLOR_PALETTES: Record<string, any> = {
@@ -150,7 +155,13 @@ const App: React.FC = () => {
 
   const [settings, setSettings] = useState<Settings>(() => {
     const saved = localStorage.getItem('erp_settings');
-    return saved ? { ...INITIAL_SETTINGS, ...JSON.parse(saved) } : INITIAL_SETTINGS;
+    const merged = saved ? { ...INITIAL_SETTINGS, ...JSON.parse(saved) } : INITIAL_SETTINGS;
+    // Luôn ưu tiên cấu hình kết nối mặc định từ mã nguồn
+    // để bất kỳ thiết bị nào cũng tự kết nối Supabase ngay khi mở web
+    merged.supabaseUrl = INITIAL_SETTINGS.supabaseUrl;
+    merged.supabaseAnonKey = INITIAL_SETTINGS.supabaseAnonKey;
+    merged.isSupabaseConnected = INITIAL_SETTINGS.isSupabaseConnected;
+    return merged;
   });
 
   const [repairTickets, setRepairTickets] = useState<RepairTicket[]>(() => {
