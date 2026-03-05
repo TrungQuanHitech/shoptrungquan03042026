@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
+import {
   LayoutDashboard, Package, ShoppingCart, Truck, Wallet, Users, CreditCard, FileText, Settings as SettingsIcon, Menu, X, Wrench
 } from 'lucide-react';
 import { Product, Order, Purchase, Transaction, Contact, Settings, View, RepairTicket, RentalContract } from './types';
@@ -90,7 +90,7 @@ const prefix = getTodayPrefix();
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<View>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('erp_products');
     return saved ? JSON.parse(saved) : SAMPLE_PRODUCTS;
@@ -241,7 +241,7 @@ const App: React.FC = () => {
     if (window.confirm("Bạn có chắc chắn muốn xóa dữ liệu hiện tại và nạp 10 dòng mẫu cho tất cả các bảng?")) {
       setProducts(SAMPLE_PRODUCTS);
       setContacts(SAMPLE_CONTACTS);
-      
+
       const newOrders = Array.from({ length: 10 }).map((_, i) => ({
         id: `BH-${prefix}${String(i + 1).padStart(3, '0')}`,
         date: new Date(Date.now() - i * 86400000).toISOString(),
@@ -278,7 +278,7 @@ const App: React.FC = () => {
         relatedId: ''
       }));
       setTransactions(newTxs);
-      
+
       const newTickets = Array.from({ length: 10 }).map((_, i) => ({
         id: `SC-${prefix}${String(i + 1).padStart(3, '0')}`,
         date: new Date(Date.now() - i * 86400000).toISOString(),
@@ -296,7 +296,7 @@ const App: React.FC = () => {
         id: `HD-${prefix}${String(i + 1).padStart(3, '0')}`,
         customerId: `c${(i % 5) + 1}`,
         machineName: `Ricoh MP ${4000 + i}`,
-        model: `Model ${2020 + (i%5)}`,
+        model: `Model ${2020 + (i % 5)}`,
         startDate: new Date(Date.now() - i * 30 * 86400000).toISOString(),
         rentalPrice: 1000000 + (i * 200000),
         freeCopiesLimit: 3000 + (i * 500),
@@ -322,10 +322,10 @@ const App: React.FC = () => {
       setRepairTickets([]);
       setRentalContracts([]);
       setSettings(INITIAL_SETTINGS);
-      
+
       // Clear all localStorage
       localStorage.clear();
-      
+
       alert("✅ Hệ thống đã được reset về trạng thái ban đầu!");
       window.location.reload(); // Force reload to ensure clean state
     }
@@ -337,30 +337,30 @@ const App: React.FC = () => {
     if (!settings.telegramBotToken || !settings.telegramChatId) return;
 
     try {
-        if (typeof payload === 'string') {
-            const url = `https://api.telegram.org/bot${settings.telegramBotToken}/sendMessage?chat_id=${settings.telegramChatId}&text=${encodeURIComponent(payload)}&parse_mode=HTML`;
-            await fetch(url);
-        } else {
-            const formData = new FormData();
-            formData.append('chat_id', settings.telegramChatId);
-            formData.append('document', payload.file, payload.filename);
-            formData.append('caption', payload.caption);
-            formData.append('parse_mode', 'HTML');
+      if (typeof payload === 'string') {
+        const url = `https://api.telegram.org/bot${settings.telegramBotToken}/sendMessage?chat_id=${settings.telegramChatId}&text=${encodeURIComponent(payload)}&parse_mode=HTML`;
+        await fetch(url);
+      } else {
+        const formData = new FormData();
+        formData.append('chat_id', settings.telegramChatId);
+        formData.append('document', payload.file, payload.filename);
+        formData.append('caption', payload.caption);
+        formData.append('parse_mode', 'HTML');
 
-            const url = `https://api.telegram.org/bot${settings.telegramBotToken}/sendDocument`;
-            const response = await fetch(url, {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-            if (!result.ok) {
-              console.error('Telegram file send error:', result);
-              alert(`Lỗi gửi file tới Telegram: ${result.description}`);
-            }
+        const url = `https://api.telegram.org/bot${settings.telegramBotToken}/sendDocument`;
+        const response = await fetch(url, {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        if (!result.ok) {
+          console.error('Telegram file send error:', result);
+          alert(`Lỗi gửi file tới Telegram: ${result.description}`);
         }
+      }
     } catch (e) {
-        console.error('Telegram Error:', e);
-        alert('Lỗi: Không thể kết nối tới máy chủ Telegram.');
+      console.error('Telegram Error:', e);
+      alert('Lỗi: Không thể kết nối tới máy chủ Telegram.');
     }
   }, [settings.telegramBotToken, settings.telegramChatId]);
 
@@ -385,7 +385,7 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (activeView) {
       case 'DASHBOARD': return <Dashboard products={products} orders={orders} purchases={purchases} transactions={transactions} contacts={contacts} settings={settings} onNavigate={navigate} onNotify={notifyTelegram} />;
-      case 'INVENTORY': return <Inventory products={products} setProducts={setProducts} settings={settings} />;
+      case 'INVENTORY': return <Inventory products={products} setProducts={setProducts} settings={settings} getAllData={getAllDataForSync} />;
       case 'POS': return <POS products={products} setProducts={setProducts} orders={orders} setOrders={setOrders} contacts={contacts} setContacts={setContacts} transactions={transactions} setTransactions={setTransactions} settings={settings} onNotify={notifyTelegram} />;
       case 'PURCHASES': return <Purchases products={products} setProducts={setProducts} purchases={purchases} setPurchases={setPurchases} contacts={contacts} setContacts={setContacts} transactions={transactions} setTransactions={setTransactions} settings={settings} onNotify={notifyTelegram} />;
       case 'SERVICES': return <Services repairTickets={repairTickets} setRepairTickets={setRepairTickets} rentalContracts={rentalContracts} setRentalContracts={setRentalContracts} contacts={contacts} setContacts={setContacts} settings={settings} onNotify={notifyTelegram} />;
@@ -393,10 +393,10 @@ const App: React.FC = () => {
       case 'CONTACTS': return <Contacts contacts={contacts} setContacts={setContacts} orders={orders} purchases={purchases} />;
       case 'DEBT': return <Debt contacts={contacts} setContacts={setContacts} transactions={transactions} setTransactions={setTransactions} orders={orders} setOrders={setOrders} purchases={purchases} setPurchases={setPurchases} settings={settings} onNotify={notifyTelegram} />;
       case 'REPORTS': return <Reports orders={orders} setOrders={setOrders} purchases={purchases} setPurchases={setPurchases} products={products} setProducts={setProducts} contacts={contacts} setContacts={setContacts} transactions={transactions} setTransactions={setTransactions} settings={settings} onNotify={notifyTelegram} />;
-      case 'SETTINGS': return <SettingsView 
-        settings={settings} 
-        setSettings={setSettings} 
-        onLoadSampleData={loadSampleData} 
+      case 'SETTINGS': return <SettingsView
+        settings={settings}
+        setSettings={setSettings}
+        onLoadSampleData={loadSampleData}
         getAllData={getAllDataForSync}
         setProducts={setProducts}
         setOrders={setOrders}
@@ -441,8 +441,8 @@ const App: React.FC = () => {
           {renderView()}
         </div>
       </main>
-      
-      <Chatbot 
+
+      <Chatbot
         products={products}
         setProducts={setProducts}
         orders={orders}

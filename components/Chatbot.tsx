@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, X, MessageSquare, BrainCircuit, Bot, User, Loader2, Trash2, GripVertical, FileText, ShoppingCart, Truck, Wallet, Users } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
 import { motion } from "motion/react";
 import { Product, Order, Purchase, Transaction, Contact, Settings } from '../types';
 
@@ -19,17 +18,17 @@ interface ChatbotProps {
   settings: Settings;
 }
 
-const Chatbot: React.FC<ChatbotProps> = ({ 
-  products, setProducts, 
-  orders, setOrders, 
-  purchases, setPurchases, 
-  transactions, setTransactions, 
+const Chatbot: React.FC<ChatbotProps> = ({
+  products, setProducts,
+  orders, setOrders,
+  purchases, setPurchases,
+  transactions, setTransactions,
   contacts, setContacts,
-  settings 
+  settings
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<{role: 'user' | 'model', content: string, isThinking?: boolean, isTool?: boolean}[]>([]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'model', content: string, isThinking?: boolean, isTool?: boolean }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [useThinking, setUseThinking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -62,81 +61,92 @@ const Chatbot: React.FC<ChatbotProps> = ({
 
   const tools = [
     {
-      functionDeclarations: [
-        {
-          name: "get_business_report",
-          description: "Lấy báo cáo chi tiết về tình hình kinh doanh (doanh thu, chi phí, lợi nhuận, nợ).",
-          parameters: {
-            type: Type.OBJECT,
-            properties: {
-              period: { type: Type.STRING, description: "Khoảng thời gian (ví dụ: 'tháng này', 'hôm nay', 'tất cả')" }
-            }
-          }
-        },
-        {
-          name: "add_new_order",
-          description: "Thực hiện bán hàng (tạo đơn hàng mới).",
-          parameters: {
-            type: Type.OBJECT,
-            properties: {
-              customer_name: { type: Type.STRING, description: "Tên khách hàng" },
-              product_name: { type: Type.STRING, description: "Tên sản phẩm" },
-              quantity: { type: Type.NUMBER, description: "Số lượng" },
-              price: { type: Type.NUMBER, description: "Giá bán thực tế" },
-              paid: { type: Type.NUMBER, description: "Số tiền khách đã trả" }
-            },
-            required: ["product_name", "quantity", "price"]
-          }
-        },
-        {
-          name: "add_new_purchase",
-          description: "Thực hiện nhập hàng (tạo đơn nhập hàng mới).",
-          parameters: {
-            type: Type.OBJECT,
-            properties: {
-              supplier_name: { type: Type.STRING, description: "Tên nhà cung cấp" },
-              product_name: { type: Type.STRING, description: "Tên sản phẩm" },
-              quantity: { type: Type.NUMBER, description: "Số lượng" },
-              cost: { type: Type.NUMBER, description: "Giá nhập" },
-              paid: { type: Type.NUMBER, description: "Số tiền đã trả NCC" }
-            },
-            required: ["product_name", "quantity", "cost"]
-          }
-        },
-        {
-          name: "add_new_transaction",
-          description: "Ghi nhận một khoản thu hoặc chi tài chính.",
-          parameters: {
-            type: Type.OBJECT,
-            properties: {
-              type: { type: Type.STRING, enum: ["IN", "OUT"], description: "Loại giao dịch: IN (Thu), OUT (Chi)" },
-              amount: { type: Type.NUMBER, description: "Số tiền" },
-              description: { type: Type.STRING, description: "Nội dung thu chi" },
-              category: { type: Type.STRING, description: "Phân loại (ví dụ: Vận hành, Lương, Mặt bằng)" }
-            },
-            required: ["type", "amount", "description"]
-          }
-        },
-        {
-          name: "add_new_contact",
-          description: "Thêm mới một khách hàng hoặc nhà cung cấp vào danh sách đối tác.",
-          parameters: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING, description: "Tên đối tác" },
-              phone: { type: Type.STRING, description: "Số điện thoại" },
-              type: { type: Type.STRING, enum: ["CUSTOMER", "SUPPLIER"], description: "Loại đối tác" }
-            },
-            required: ["name", "type"]
+      type: "function",
+      function: {
+        name: "get_business_report",
+        description: "Lấy báo cáo chi tiết về tình hình kinh doanh (doanh thu, chi phí, lợi nhuận, nợ).",
+        parameters: {
+          type: "object",
+          properties: {
+            period: { type: "string", description: "Khoảng thời gian (ví dụ: 'tháng này', 'hôm nay', 'tất cả')" }
           }
         }
-      ]
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_new_order",
+        description: "Thực hiện bán hàng (tạo đơn hàng mới).",
+        parameters: {
+          type: "object",
+          properties: {
+            customer_name: { type: "string", description: "Tên khách hàng" },
+            product_name: { type: "string", description: "Tên sản phẩm" },
+            quantity: { type: "number", description: "Số lượng" },
+            price: { type: "number", description: "Giá bán thực tế" },
+            paid: { type: "number", description: "Số tiền khách đã trả" }
+          },
+          required: ["product_name", "quantity", "price"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_new_purchase",
+        description: "Thực hiện nhập hàng (tạo đơn nhập hàng mới).",
+        parameters: {
+          type: "object",
+          properties: {
+            supplier_name: { type: "string", description: "Tên nhà cung cấp" },
+            product_name: { type: "string", description: "Tên sản phẩm" },
+            quantity: { type: "number", description: "Số lượng" },
+            cost: { type: "number", description: "Giá nhập" },
+            paid: { type: "number", description: "Số tiền đã trả NCC" }
+          },
+          required: ["product_name", "quantity", "cost"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_new_transaction",
+        description: "Ghi nhận một khoản thu hoặc chi tài chính.",
+        parameters: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["IN", "OUT"], description: "Loại giao dịch: IN (Thu), OUT (Chi)" },
+            amount: { type: "number", description: "Số tiền" },
+            description: { type: "string", description: "Nội dung thu chi" },
+            category: { type: "string", description: "Phân loại (ví dụ: Vận hành, Lương, Mặt bằng)" }
+          },
+          required: ["type", "amount", "description"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_new_contact",
+        description: "Thêm mới một khách hàng hoặc nhà cung cấp vào danh sách đối tác.",
+        parameters: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Tên đối tác" },
+            phone: { type: "string", description: "Số điện thoại" },
+            type: { type: "string", enum: ["CUSTOMER", "SUPPLIER"], description: "Loại đối tác" }
+          },
+          required: ["name", "type"]
+        }
+      }
     }
   ];
 
   const handleFunctionCall = (call: any) => {
     const { name, args } = call;
-    
+
     switch (name) {
       case "get_business_report":
         const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
@@ -156,7 +166,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       case "add_new_order":
         const product = products.find(p => p.name.toLowerCase().includes(args.product_name.toLowerCase()));
         if (!product) return JSON.stringify({ status: "error", message: "Không tìm thấy sản phẩm này trong kho." });
-        
+
         const orderId = `BH-AI-${Date.now()}`;
         const newOrder: Order = {
           id: orderId,
@@ -167,7 +177,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
           debt: Math.max(0, (args.price * args.quantity) - (args.paid || (args.price * args.quantity))),
           customerId: contacts.find(c => c.name.toLowerCase().includes((args.customer_name || '').toLowerCase()))?.id || 'default'
         };
-        
+
         setOrders(prev => [newOrder, ...prev]);
         setProducts(prev => prev.map(p => p.id === product.id ? { ...p, stock: p.stock - args.quantity } : p));
         if (newOrder.paid > 0) {
@@ -186,7 +196,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       case "add_new_purchase":
         const pToBuy = products.find(p => p.name.toLowerCase().includes(args.product_name.toLowerCase()));
         if (!pToBuy) return JSON.stringify({ status: "error", message: "Không tìm thấy sản phẩm này để nhập hàng." });
-        
+
         const purchaseId = `NH-AI-${Date.now()}`;
         const newPurchase: Purchase = {
           id: purchaseId,
@@ -197,7 +207,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
           debt: Math.max(0, (args.cost * args.quantity) - (args.paid || (args.cost * args.quantity))),
           supplierId: contacts.find(c => c.name.toLowerCase().includes((args.supplier_name || '').toLowerCase()))?.id || 'default'
         };
-        
+
         setPurchases(prev => [newPurchase, ...prev]);
         setProducts(prev => prev.map(p => p.id === pToBuy.id ? { ...p, stock: p.stock + args.quantity, cost: args.cost } : p));
         return JSON.stringify({ status: "success", message: `Đã nhập hàng ${purchaseId} thành công.` });
@@ -233,62 +243,100 @@ const Chatbot: React.FC<ChatbotProps> = ({
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    if (!settings.groqApiKey) {
+      setMessages(prev => [...prev, { role: 'model', content: "⚠️ Vui lòng cấu hình Groq API Key trong phần Cài đặt > Cấu hình AI trước khi sử dụng." }]);
+      return;
+    }
+
     const userMessage = input.trim();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const modelName = useThinking ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
-      
-      const config: any = {
-        systemInstruction: generateSystemContext(),
-        tools: tools
-      };
+      const modelName = useThinking ? 'deepseek-r1-distill-llama-70b' : 'llama-3.3-70b-versatile';
 
-      if (useThinking) {
-        config.thinkingConfig = { thinkingBudget: 32768 };
-      }
+      const systemMsg = { role: "system", content: generateSystemContext() };
 
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: userMessage,
-        config: config
-      });
-
-      if (response.functionCalls) {
-        const toolResults = response.functionCalls.map(call => ({
-          name: call.name,
-          response: handleFunctionCall(call)
+      const chatHistory = messages
+        .filter(m => m.role === 'user' || m.role === 'model')
+        .map(m => ({
+          role: m.role === 'model' ? 'assistant' : 'user',
+          content: m.content
         }));
 
-        // Send results back to model for final response
-        const finalResponse = await ai.models.generateContent({
-          model: modelName,
-          contents: [
-            { role: 'user', parts: [{ text: userMessage }] },
-            { role: 'model', parts: response.candidates[0].content.parts },
-            { role: 'user', parts: toolResults.map(res => ({
-                functionResponse: {
-                  name: res.name,
-                  response: { result: res.response }
-                }
-              }))
-            }
-          ],
-          config: config
+      const payload: any = {
+        model: modelName,
+        messages: [systemMsg, ...chatHistory, { role: "user", content: userMessage }],
+        tools: tools,
+        tool_choice: "auto"
+      };
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${settings.groqApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || 'Lỗi API');
+      }
+
+      const data = await response.json();
+      const responseMessage = data.choices[0].message;
+
+      if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+        const toolResults = responseMessage.tool_calls.map((call: any) => {
+          let args = {};
+          try {
+            args = JSON.parse(call.function.arguments);
+          } catch (e) { }
+          return {
+            tool_call_id: call.id,
+            role: "tool",
+            name: call.function.name,
+            content: handleFunctionCall({ name: call.function.name, args })
+          };
         });
 
-        const finalText = finalResponse.text || "Đã thực hiện xong yêu cầu của bạn.";
+        const secondPayload = {
+          model: modelName,
+          messages: [
+            ...payload.messages,
+            responseMessage,
+            ...toolResults
+          ]
+        };
+
+        const finalResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${settings.groqApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(secondPayload)
+        });
+
+        if (!finalResponse.ok) {
+          const err = await finalResponse.json();
+          throw new Error(err.error?.message || 'Lỗi API (Second Step)');
+        }
+
+        const finalData = await finalResponse.json();
+        const finalText = finalData.choices[0].message.content || "Đã thực hiện xong yêu cầu của bạn.";
         setMessages(prev => [...prev, { role: 'model', content: finalText, isThinking: useThinking, isTool: true }]);
+
       } else {
-        const text = response.text || "Xin lỗi, tôi không thể xử lý yêu cầu này.";
+        const text = responseMessage.content || "Xin lỗi, tôi không thể xử lý yêu cầu này.";
         setMessages(prev => [...prev, { role: 'model', content: text, isThinking: useThinking }]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Error:", error);
-      setMessages(prev => [...prev, { role: 'model', content: "Có lỗi xảy ra khi kết nối với trí tuệ nhân tạo. Vui lòng kiểm tra lại cấu hình API." }]);
+      setMessages(prev => [...prev, { role: 'model', content: `Có lỗi xảy ra: ${error.message}. Vui lòng kiểm tra lại Groq API Key hoặc thiết lập mạng.` }]);
     } finally {
       setIsLoading(false);
     }
@@ -297,7 +345,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
   return (
     <>
       {/* Draggable Floating Toggle Button */}
-      <motion.button 
+      <motion.button
         drag
         dragMomentum={false}
         onClick={() => setIsOpen(true)}
@@ -336,11 +384,11 @@ const Chatbot: React.FC<ChatbotProps> = ({
 
           {/* Quick Actions Bar */}
           <div className="bg-slate-800 p-2 flex gap-2 overflow-x-auto no-scrollbar border-b border-slate-700">
-            <button onClick={() => setInput("Xuất báo cáo doanh thu tổng quát")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><FileText size={12}/> Báo cáo</button>
-            <button onClick={() => setInput("Bán 1 sản phẩm [Tên SP] cho khách hàng [Tên KH]")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><ShoppingCart size={12}/> Bán hàng</button>
-            <button onClick={() => setInput("Nhập thêm 10 [Tên SP] từ nhà cung cấp [Tên NCC]")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><Truck size={12}/> Nhập hàng</button>
-            <button onClick={() => setInput("Ghi nhận chi phí tiền điện 500k")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-rose-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><Wallet size={12}/> Thu chi</button>
-            <button onClick={() => setInput("Thêm khách hàng mới: [Tên] - [SĐT]")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><Users size={12}/> Đối tác</button>
+            <button onClick={() => setInput("Xuất báo cáo doanh thu tổng quát")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><FileText size={12} /> Báo cáo</button>
+            <button onClick={() => setInput("Bán 1 sản phẩm [Tên SP] cho khách hàng [Tên KH]")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><ShoppingCart size={12} /> Bán hàng</button>
+            <button onClick={() => setInput("Nhập thêm 10 [Tên SP] từ nhà cung cấp [Tên NCC]")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><Truck size={12} /> Nhập hàng</button>
+            <button onClick={() => setInput("Ghi nhận chi phí tiền điện 500k")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-rose-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><Wallet size={12} /> Thu chi</button>
+            <button onClick={() => setInput("Thêm khách hàng mới: [Tên] - [SĐT]")} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap"><Users size={12} /> Đối tác</button>
           </div>
 
           {/* Messages Area */}
@@ -365,7 +413,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 </div>
               </div>
             )}
-            
+
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[90%] rounded-2xl p-4 shadow-md ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'}`}>
@@ -382,7 +430,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 </div>
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 rounded-bl-none shadow-md flex items-center gap-3">
@@ -401,7 +449,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
           {/* Input Area */}
           <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
             <div className="flex items-center gap-2 mb-3">
-              <button 
+              <button
                 onClick={() => setUseThinking(!useThinking)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${useThinking ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}
               >
@@ -413,7 +461,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <div className="flex-1 relative">
-                <input 
+                <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -424,7 +472,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
                   <MessageSquare size={18} />
                 </div>
               </div>
-              <button 
+              <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
                 className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100 active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 transition-all"
@@ -433,9 +481,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
               </button>
             </div>
             <div className="flex items-center justify-center gap-4 mt-3">
-               <p className="text-[8px] text-slate-300 uppercase font-black tracking-[0.2em]">Enterprise AI Tool v2.0</p>
-               <div className="h-px w-8 bg-slate-100"></div>
-               <p className="text-[8px] text-slate-300 uppercase font-black tracking-[0.2em]">Secure Data Access</p>
+              <p className="text-[8px] text-slate-300 uppercase font-black tracking-[0.2em]">Enterprise AI Tool v2.0</p>
+              <div className="h-px w-8 bg-slate-100"></div>
+              <p className="text-[8px] text-slate-300 uppercase font-black tracking-[0.2em]">Secure Data Access</p>
             </div>
           </div>
         </div>
