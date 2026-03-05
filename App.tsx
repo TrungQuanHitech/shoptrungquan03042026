@@ -156,11 +156,15 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<Settings>(() => {
     const saved = localStorage.getItem('erp_settings');
     const merged = saved ? { ...INITIAL_SETTINGS, ...JSON.parse(saved) } : INITIAL_SETTINGS;
-    // Luôn ưu tiên cấu hình kết nối mặc định từ mã nguồn
-    // để bất kỳ thiết bị nào cũng tự kết nối Supabase ngay khi mở web
+    // Luôn ưu tiên cấu hình kết nối mặc định từ mã nguồn (Environment Variables)
+    // để bất kỳ thiết bị nào cũng tự kết nối mọi dịch vụ ngay khi mở web
     merged.supabaseUrl = INITIAL_SETTINGS.supabaseUrl;
     merged.supabaseAnonKey = INITIAL_SETTINGS.supabaseAnonKey;
     merged.isSupabaseConnected = INITIAL_SETTINGS.isSupabaseConnected;
+    merged.groqApiKey = INITIAL_SETTINGS.groqApiKey;
+    merged.googleClientId = INITIAL_SETTINGS.googleClientId;
+    merged.telegramBotToken = INITIAL_SETTINGS.telegramBotToken;
+    merged.telegramChatId = INITIAL_SETTINGS.telegramChatId;
     return merged;
   });
 
