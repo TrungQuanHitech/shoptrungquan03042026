@@ -17,6 +17,7 @@ import Reports from './components/Reports';
 import SettingsView from './components/SettingsView';
 import Services from './components/Services';
 import Chatbot from './components/Chatbot';
+import { pullFromSupabase, pushToSupabase } from './src/services/supabaseSync';
 
 const getTodayPrefix = () => {
   const now = new Date();
@@ -171,6 +172,38 @@ const App: React.FC = () => {
     repairTickets,
     rentalContracts
   });
+
+  // Background Pull on Startup
+  useEffect(() => {
+    const initData = async () => {
+      if (settings.isSupabaseConnected) {
+        console.log("Supabase: Background pulling data...");
+        const data = await pullFromSupabase(settings);
+        if (data) {
+          if (data.products) setProducts(data.products as Product[]);
+          if (data.orders) setOrders(data.orders as Order[]);
+          if (data.purchases) setPurchases(data.purchases as Purchase[]);
+          if (data.transactions) setTransactions(data.transactions as Transaction[]);
+          if (data.contacts) setContacts(data.contacts as Contact[]);
+          if (data.repairTickets) setRepairTickets(data.repairTickets as RepairTicket[]);
+          if (data.rentalContracts) setRentalContracts(data.rentalContracts as RentalContract[]);
+          console.log("Supabase: Background pull complete.");
+        }
+      }
+    };
+    initData();
+  }, [settings.isSupabaseConnected]); // Only runs once on mount or when connection toggled
+
+  // Auto-sync (Push) to Supabase debounced
+  useEffect(() => {
+    if (settings.isSupabaseConnected && settings.autoSync) {
+      const timer = setTimeout(() => {
+        console.log("Supabase: Auto-syncing data to cloud...");
+        pushToSupabase(settings, getAllDataForSync());
+      }, 5000); // 5 seconds debounce
+      return () => clearTimeout(timer);
+    }
+  }, [products, orders, purchases, transactions, contacts, repairTickets, rentalContracts, settings]);
 
   useEffect(() => {
     localStorage.setItem('erp_products', JSON.stringify(products));

@@ -128,6 +128,10 @@ export interface Settings {
   googleAccessToken?: string;
   googleUserEmail?: string;
   googleTokenExpiry?: number; // Unix timestamp (ms) khi token hết hạn
+  // Supabase settings
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+  isSupabaseConnected?: boolean;
 }
 
 export type View = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'PURCHASES' | 'SERVICES' | 'FINANCE' | 'CONTACTS' | 'DEBT' | 'REPORTS' | 'SETTINGS';

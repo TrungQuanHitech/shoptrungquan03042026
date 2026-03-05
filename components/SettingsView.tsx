@@ -4,6 +4,8 @@ import { Save, MapPin, CreditCard, Database, MessageSquare, Table, Send, CheckCi
 import { Settings, Product, Order, Purchase, Contact, Transaction, RepairTicket, RentalContract } from '../types';
 import { syncToGoogleSheet, syncToGoogleSheetDirect, createSpreadsheet, createDriveFolder, createSheetTab } from '../src/services/googleSheetSync';
 import { signInWithGoogle, signOutGoogle, getValidToken } from '../src/services/googleIdentity';
+import { pushToSupabase, pullFromSupabase } from '../src/services/supabaseSync';
+import { verifySupabaseConnection } from '../src/services/supabaseClient';
 import * as XLSX from 'xlsx';
 
 interface SettingsViewProps {
@@ -37,6 +39,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isCreatingSheetTab, setIsCreatingSheetTab] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error' | 'token_expired'>('idle');
+  const [isSupabaseSyncing, setIsSupabaseSyncing] = useState(false);
+  const [isSupabasePulling, setIsSupabasePulling] = useState(false);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -50,6 +54,66 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   useEffect(() => {
     setIsSaved(false);
   }, [localSettings]);
+
+  const handleSupabaseConnect = async () => {
+    if (!localSettings.supabaseUrl || !localSettings.supabaseAnonKey) {
+      alert("⚠️ Vui lòng nhập Supabase URL và Supabase Anon Key!");
+      return;
+    }
+    const isConn = await verifySupabaseConnection(localSettings);
+    if (isConn) {
+      const newSettings = { ...localSettings, isSupabaseConnected: true };
+      setLocalSettings(newSettings);
+      setSettings(newSettings);
+      localStorage.setItem('erp_settings', JSON.stringify(newSettings));
+      alert("✅ Kết nối Cơ sở dữ liệu Supabase thành công!");
+    } else {
+      const newSettings = { ...localSettings, isSupabaseConnected: false };
+      setLocalSettings(newSettings);
+      setSettings(newSettings);
+      localStorage.setItem('erp_settings', JSON.stringify(newSettings));
+      alert("🔴 Kết nối thất bại. Vui lòng kiểm tra lại URL hoặc Key.");
+    }
+  };
+
+  const handleSupabasePush = async () => {
+    if (!localSettings.isSupabaseConnected) return;
+    setIsSupabaseSyncing(true);
+    try {
+      const data = getAllData();
+      const success = await pushToSupabase(localSettings, data);
+      if (success) {
+        alert("✅ Đã GỬI (Push) toàn bộ dữ liệu lên mây thành công!");
+      } else {
+        alert("🔴 Gửi dữ liệu thất bại.");
+      }
+    } finally {
+      setIsSupabaseSyncing(false);
+    }
+  };
+
+  const handleSupabasePull = async () => {
+    if (!localSettings.isSupabaseConnected) return;
+    if (!window.confirm("⚠️ QUAN TRỌNG: Kéo dữ liệu từ Cloud sẽ XÓA ĐÈ toàn bộ dữ liệu hiện trên thiết bị này!\n\nBạn có chắc chắn muốn TẢI VỀ?")) return;
+    setIsSupabasePulling(true);
+    try {
+      const data = await pullFromSupabase(localSettings);
+      if (data) {
+        if (data.products && setProducts) setProducts(data.products as Product[]);
+        if (data.orders && setOrders) setOrders(data.orders as Order[]);
+        if (data.purchases && setPurchases) setPurchases(data.purchases as Purchase[]);
+        if (data.transactions && setTransactions) setTransactions(data.transactions as Transaction[]);
+        if (data.contacts && setContacts) setContacts(data.contacts as Contact[]);
+        if (data.repairTickets && setRepairTickets) setRepairTickets(data.repairTickets as RepairTicket[]);
+        if (data.rentalContracts && setRentalContracts) setRentalContracts(data.rentalContracts as RentalContract[]);
+        alert("✅ Đã TẢI (Pull) dữ liệu từ mây về thiết bị này thành công!");
+      } else {
+        alert("🔴 Không thể tải dữ liệu.");
+      }
+    } finally {
+      setIsSupabasePulling(false);
+    }
+  };
 
   const handleGoogleConnect = async () => {
     if (!localSettings.googleClientId) {
@@ -720,9 +784,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               disabled={isSyncing}
               onClick={handleSync}
               className={`w-full py-3 text-white rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 text-[0.8rem] shadow-lg active:scale-95 transition-all disabled:bg-slate-300 ${syncStatus === 'success' ? 'bg-emerald-500' :
-                  syncStatus === 'error' ? 'bg-rose-500' :
-                    syncStatus === 'token_expired' ? 'bg-amber-500' :
-                      'bg-emerald-600'
+                syncStatus === 'error' ? 'bg-rose-500' :
+                  syncStatus === 'token_expired' ? 'bg-amber-500' :
+                    'bg-emerald-600'
                 }`}
             >
               <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
@@ -752,6 +816,68 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input value={localSettings.telegramBotToken} onChange={e => setLocalSettings({ ...localSettings, telegramBotToken: e.target.value })} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none" placeholder="Token: 123456:ABC..." />
             <input value={localSettings.telegramChatId} onChange={e => setLocalSettings({ ...localSettings, telegramChatId: e.target.value })} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none" placeholder="Chat ID: -100..." />
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center gap-3 border-b border-slate-50 pb-4">
+            <Database size={20} className="text-blue-500" />
+            <h3 className="font-bold uppercase text-xs tracking-wider">Cấu hình Cơ sở dữ liệu Supabase (Cloud)</h3>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl">
+            <p className="text-xs text-blue-700 font-medium">Bật cơ sở dữ liệu Supabase để đồng bộ dữ liệu Realtime (Thời gian thực) và lưu trữ chuyên nghiệp thay thế Google Sheets. An toàn và không giới hạn thiết bị.</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Supabase URL</label>
+              <input
+                type="text"
+                value={localSettings.supabaseUrl || ''}
+                onChange={e => setLocalSettings({ ...localSettings, supabaseUrl: e.target.value })}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none"
+                placeholder="https://xxxxxx.supabase.co"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Supabase Anon Key</label>
+              <input
+                type="password"
+                value={localSettings.supabaseAnonKey || ''}
+                onChange={e => setLocalSettings({ ...localSettings, supabaseAnonKey: e.target.value })}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none"
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleSupabaseConnect}
+                className={`flex-1 py-3 ${localSettings.isSupabaseConnected ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-blue-50 text-blue-600 border-blue-200'} border rounded-xl font-bold uppercase text-[0.8rem] flex items-center justify-center gap-2 hover:opacity-80 transition-all`}
+              >
+                <Link size={16} />
+                {localSettings.isSupabaseConnected ? 'Đã Kết Nối Supabase' : 'Kiểm tra & Kết nối'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSupabasePush}
+                disabled={!localSettings.isSupabaseConnected || isSupabaseSyncing}
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold uppercase text-[0.8rem] flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <Send size={16} className={isSupabaseSyncing ? "animate-spin" : ""} />
+                {isSupabaseSyncing ? "Đang gửi..." : "GỬI LÊN (Push)"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSupabasePull}
+                disabled={!localSettings.isSupabaseConnected || isSupabasePulling}
+                className="flex-1 py-3 bg-orange-500 text-white rounded-xl font-bold uppercase text-[0.8rem] flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <DatabaseBackup size={16} className={isSupabasePulling ? "animate-spin" : ""} />
+                {isSupabasePulling ? "Đang tải..." : "TẢI VỀ (Pull)"}
+              </button>
+            </div>
           </div>
         </div>
 
