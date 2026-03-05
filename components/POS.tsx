@@ -27,64 +27,64 @@ const ViewOrderDetailsModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4 backdrop-blur-sm">
-       <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col animate-in zoom-in duration-300 max-h-[90vh]">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-slate-800">Chi tiết đơn hàng</h3>
-              <p className="text-xs font-mono text-indigo-600">{order.id}</p>
-            </div>
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-200"><X size={20} /></button>
+      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col animate-in zoom-in duration-300 max-h-[90vh]">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-slate-800">Chi tiết đơn hàng</h3>
+            <p className="text-xs font-mono text-indigo-600">{order.id}</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><strong className="text-slate-500 block text-xs">Ngày:</strong> {new Date(order.date).toLocaleString('vi-VN')}</div>
-                <div><strong className="text-slate-500 block text-xs">Khách hàng:</strong> {customerName}</div>
-              </div>
-              <table className="w-full text-left text-sm mt-4">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="p-2 font-bold">Sản phẩm</th>
-                    <th className="p-2 font-bold text-center">SL</th>
-                    <th className="p-2 font-bold text-right">Thành tiền</th>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-200"><X size={20} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div><strong className="text-slate-500 block text-xs">Ngày:</strong> {new Date(order.date).toLocaleString('vi-VN')}</div>
+            <div><strong className="text-slate-500 block text-xs">Khách hàng:</strong> {customerName}</div>
+          </div>
+          <table className="w-full text-left text-sm mt-4">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="p-2 font-bold">Sản phẩm</th>
+                <th className="p-2 font-bold text-center">SL</th>
+                <th className="p-2 font-bold text-right">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {order.items.map((item, idx) => {
+                const p = products.find(prod => prod.id === item.productId);
+                return (
+                  <tr key={idx}>
+                    <td className="p-2">{p?.name || 'Sản phẩm đã xóa'}</td>
+                    <td className="p-2 text-center">{item.quantity}</td>
+                    <td className="p-2 text-right font-semibold">{(item.price * item.quantity).toLocaleString()}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {order.items.map((item, idx) => {
-                    const p = products.find(prod => prod.id === item.productId);
-                    return (
-                      <tr key={idx}>
-                        <td className="p-2">{p?.name || 'Sản phẩm đã xóa'}</td>
-                        <td className="p-2 text-center">{item.quantity}</td>
-                        <td className="p-2 text-right font-semibold">{(item.price * item.quantity).toLocaleString()}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <div className="mt-4 pt-4 border-t border-slate-200 space-y-1 text-sm">
-                  <div className="flex justify-between"><span>Tạm tính:</span><span>{ (order.total - (order.taxAmount || 0)).toLocaleString() } đ</span></div>
-                  {(order.taxAmount || 0) > 0 && (
-                      <div className="flex justify-between"><span>Thuế VAT ({order.taxRate}%):</span><span>{order.taxAmount?.toLocaleString()} đ</span></div>
-                  )}
-                  <div className="flex justify-between font-bold text-base text-indigo-600"><span>Tổng cộng:</span><span>{order.total.toLocaleString()} đ</span></div>
-                  <div className="flex justify-between text-emerald-600"><span>Đã trả:</span><span>{order.paid.toLocaleString()} đ</span></div>
-                  {order.debt > 0 && (
-                      <div className="flex justify-between font-bold text-rose-600"><span>Còn nợ:</span><span>{order.debt.toLocaleString()} đ</span></div>
-                  )}
-              </div>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="mt-4 pt-4 border-t border-slate-200 space-y-1 text-sm">
+            <div className="flex justify-between"><span>Tạm tính:</span><span>{(order.total - (order.taxAmount || 0)).toLocaleString()} đ</span></div>
+            {(order.taxAmount || 0) > 0 && (
+              <div className="flex justify-between"><span>Thuế VAT ({order.taxRate}%):</span><span>{order.taxAmount?.toLocaleString()} đ</span></div>
+            )}
+            <div className="flex justify-between font-bold text-base text-indigo-600"><span>Tổng cộng:</span><span>{order.total.toLocaleString()} đ</span></div>
+            <div className="flex justify-between text-emerald-600"><span>Đã trả:</span><span>{order.paid.toLocaleString()} đ</span></div>
+            {order.debt > 0 && (
+              <div className="flex justify-between font-bold text-rose-600"><span>Còn nợ:</span><span>{order.debt.toLocaleString()} đ</span></div>
+            )}
           </div>
-          <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2">
-            <button onClick={() => onPrint(order)} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl text-sm uppercase hover:bg-indigo-700 flex items-center justify-center gap-2"><Printer size={18} /> In hóa đơn</button>
-            <button onClick={onClose} className="flex-1 py-3 bg-slate-200 text-slate-700 font-bold rounded-xl text-sm uppercase hover:bg-slate-300">Đóng</button>
-          </div>
-       </div>
+        </div>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2">
+          <button onClick={() => onPrint(order)} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl text-sm uppercase hover:bg-indigo-700 flex items-center justify-center gap-2"><Printer size={18} /> In hóa đơn</button>
+          <button onClick={onClose} className="flex-1 py-3 bg-slate-200 text-slate-700 font-bold rounded-xl text-sm uppercase hover:bg-slate-300">Đóng</button>
+        </div>
+      </div>
     </div>
   );
 };
 
 
 const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, contacts, setContacts, transactions, setTransactions, settings, onNotify }) => {
-  const [cart, setCart] = useState<{product: Product, quantity: number, price: number}[]>([]);
+  const [cart, setCart] = useState<{ product: Product, quantity: number, price: number }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('default');
   const [paidAmount, setPaidAmount] = useState<number>(0);
@@ -92,7 +92,7 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [checkoutSuccessId, setCheckoutSuccessId] = useState<string | null>(null);
   const [currentTaxRate, setCurrentTaxRate] = useState<number>(settings.taxRate);
-  
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
@@ -213,6 +213,10 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
   }, []);
 
   const cartSubtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+
+  const updateCartItemPrice = (productId: string, newPrice: number) => {
+    setCart(prev => prev.map(item => item.product.id === productId ? { ...item, price: newPrice } : item));
+  };
   const cartTax = useMemo(() => Math.round(cartSubtotal * (currentTaxRate / 100)), [cartSubtotal, currentTaxRate]);
   const cartTotal = useMemo(() => cartSubtotal + cartTax, [cartSubtotal, cartTax]);
 
@@ -225,10 +229,10 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
     const y = String(now.getFullYear()).slice(-2);
     const datePart = `${d}${m}${y}`;
     const prefix = `BH-${datePart}`;
-    
+
     const todayOrders = orders.filter(o => o.id.startsWith(prefix));
     let nextNum = 1;
-    
+
     if (todayOrders.length > 0) {
       const suffixes = todayOrders.map(o => {
         const numPart = o.id.replace(prefix, '');
@@ -237,7 +241,7 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
       });
       nextNum = Math.max(...suffixes) + 1;
     }
-    
+
     return `${prefix}${String(nextNum).padStart(3, '0')}`;
   };
 
@@ -255,7 +259,7 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
         }));
         // 2. Revert debt
         if (originalOrder.debt > 0 && originalOrder.customerId !== 'default') {
-          setContacts(prev => prev.map(c => 
+          setContacts(prev => prev.map(c =>
             c.id === originalOrder.customerId ? { ...c, debt: Math.max(0, c.debt - originalOrder.debt) } : c
           ));
         }
@@ -286,7 +290,7 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
 
     // 2. Apply new debt
     if (newOrder.debt > 0 && newOrder.customerId !== 'default') {
-      setContacts(prev => prev.map(c => 
+      setContacts(prev => prev.map(c =>
         c.id === newOrder.customerId ? { ...c, debt: c.debt + newOrder.debt } : c
       ));
     }
@@ -312,9 +316,9 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
       }
       return [newOrder, ...prev];
     });
-    
+
     // --- FINALIZATION ---
-    const escapeHTML = (str: string) => str.replace(/[&<>"']/g, (m) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m] || m));
+    const escapeHTML = (str: string) => str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] || m));
     if (settings.notifyOnSale && onNotify) {
       const customer = contacts.find(c => c.id === selectedCustomerId)?.name || 'Khách vãng lai';
       const itemsList = cart.map(i => `• ${escapeHTML(i.product.name)} x<b>${i.quantity}</b>`).join('\n');
@@ -340,7 +344,7 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
     const restoredCart = order.items.map(item => {
       const product = products.find(p => p.id === item.productId);
       return product ? { product, quantity: item.quantity, price: item.price } : null;
-    }).filter(Boolean) as {product: Product, quantity: number, price: number}[];
+    }).filter(Boolean) as { product: Product, quantity: number, price: number }[];
     setCart(restoredCart);
     setSelectedCustomerId(order.customerId);
     setPaidAmount(order.paid);
@@ -358,8 +362,8 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
         <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 bg-indigo-600 text-white border-2 border-indigo-400`}>
           <CheckCircle2 size={24} className="text-white" />
           <div>
-             <p className="font-black text-[0.85rem] uppercase tracking-wide">Thanh toán thành công</p>
-             <p className="font-bold text-[0.9rem] text-indigo-100">Đã tạo đơn hàng: {checkoutSuccessId}</p>
+            <p className="font-black text-[0.85rem] uppercase tracking-wide">Thanh toán thành công</p>
+            <p className="font-bold text-[0.9rem] text-indigo-100">Đã tạo đơn hàng: {checkoutSuccessId}</p>
           </div>
         </div>
       )}
@@ -427,11 +431,20 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
               </div>
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                  <button onClick={() => setCart(prev => prev.map(i => i.product.id === item.product.id ? {...i, quantity: Math.max(1, i.quantity - 1)} : i))} className="w-5 h-5 bg-white hover:bg-slate-50 rounded flex items-center justify-center text-slate-600 shadow-sm transition-all text-xs font-bold">-</button>
+                  <button onClick={() => setCart(prev => prev.map(i => i.product.id === item.product.id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))} className="w-5 h-5 bg-white hover:bg-slate-50 rounded flex items-center justify-center text-slate-600 shadow-sm transition-all text-xs font-bold">-</button>
                   <span className="font-bold text-[0.8rem] w-4 text-center">{item.quantity}</span>
-                  <button onClick={() => setCart(prev => prev.map(i => i.product.id === item.product.id ? {...i, quantity: i.quantity + 1} : i))} className="w-5 h-5 bg-white hover:bg-slate-50 rounded flex items-center justify-center text-slate-600 shadow-sm transition-all text-xs font-bold">+</button>
+                  <button onClick={() => setCart(prev => prev.map(i => i.product.id === item.product.id ? { ...i, quantity: i.quantity + 1 } : i))} className="w-5 h-5 bg-white hover:bg-slate-50 rounded flex items-center justify-center text-slate-600 shadow-sm transition-all text-xs font-bold">+</button>
                 </div>
                 <div className="text-right">
+                  <div className="flex items-center justify-end gap-1 mb-0.5">
+                    <span className="text-[8px] text-slate-400 uppercase font-bold text">Đơn giá:</span>
+                    <input
+                      type="number"
+                      value={item.price}
+                      onChange={(e) => updateCartItemPrice(item.product.id, Number(e.target.value))}
+                      className="w-20 text-right text-indigo-600 font-bold text-[0.85rem] border-b border-transparent hover:border-slate-200 outline-none focus:border-indigo-300 bg-transparent"
+                    />
+                  </div>
                   <div className="font-bold text-slate-900 text-[0.85rem]">{(item.price * item.quantity).toLocaleString()} đ</div>
                 </div>
               </div>
@@ -439,8 +452,8 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
           ))}
           {cart.length === 0 && (
             <div className="py-20 flex flex-col items-center justify-center text-slate-300 gap-3">
-               <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center shadow-inner"><ShoppingCart size={28} /></div>
-               <p className="text-[0.8rem] font-medium italic">Chọn sản phẩm để bán</p>
+              <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center shadow-inner"><ShoppingCart size={28} /></div>
+              <p className="text-[0.8rem] font-medium italic">Chọn sản phẩm để bán</p>
             </div>
           )}
         </div>
@@ -450,7 +463,7 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
             <div className="flex justify-between text-slate-500 text-[9px] font-bold uppercase"><span>Tạm tính</span><span>{cartSubtotal.toLocaleString()} đ</span></div>
             <div className="flex justify-between items-center text-slate-500 text-[9px] font-bold uppercase">
               <span className="flex items-center gap-1">Thuế VAT <Percent size={10} /></span>
-               <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1">
                 <input type="number" className="w-8 border-b border-slate-300 bg-transparent text-right outline-none text-rose-500 font-bold text-[0.85rem]" value={currentTaxRate} onChange={(e) => setCurrentTaxRate(Number(e.target.value))} />
                 <span className="text-rose-500 font-bold">%</span>
                 <span className="text-rose-600 font-bold ml-1">{cartTax.toLocaleString()} đ</span>
@@ -465,8 +478,8 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
           <div className="space-y-1">
             <label className="text-[9px] font-bold uppercase text-slate-400 tracking-wider">Chọn khách hàng</label>
             <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-[0.85rem] font-bold shadow-sm focus:ring-2 focus:ring-indigo-100 outline-none">
-               <option value="default">Khách vãng lai (Lẻ)</option>
-               {contacts.filter(c => c.type === 'CUSTOMER').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="default">Khách vãng lai (Lẻ)</option>
+              {contacts.filter(c => c.type === 'CUSTOMER').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
 
@@ -487,11 +500,11 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
       </div>
 
       {viewingOrder && (
-        <ViewOrderDetailsModal 
-          order={viewingOrder} 
-          onClose={() => setViewingOrder(null)} 
-          products={products} 
-          contacts={contacts} 
+        <ViewOrderDetailsModal
+          order={viewingOrder}
+          onClose={() => setViewingOrder(null)}
+          products={products}
+          contacts={contacts}
           onPrint={handlePrintInvoice}
         />
       )}
@@ -500,37 +513,37 @@ const POS: React.FC<POSProps> = ({ products, setProducts, orders, setOrders, con
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="px-4 py-3 border-b flex items-center justify-between bg-slate-50">
-               <h3 className="font-bold text-slate-700 uppercase text-[0.85rem]">Lịch sử đơn hàng gần đây</h3>
-               <button onClick={() => setShowHistory(false)}><X size={20} /></button>
+              <h3 className="font-bold text-slate-700 uppercase text-[0.85rem]">Lịch sử đơn hàng gần đây</h3>
+              <button onClick={() => setShowHistory(false)}><X size={20} /></button>
             </div>
             <div className="flex-1 overflow-auto">
-               <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-[9px] font-bold text-slate-400 uppercase sticky top-0 border-b border-slate-100 z-10">
-                    <tr>
-                      <th className="px-4 py-2">Mã đơn</th>
-                      <th className="px-4 py-2">Ngày giờ</th>
-                      <th className="px-4 py-2">Khách hàng</th>
-                      <th className="px-4 py-2 text-right">Tổng tiền</th>
-                      <th className="px-4 py-2 text-center w-32">Thao tác</th>
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 text-[9px] font-bold text-slate-400 uppercase sticky top-0 border-b border-slate-100 z-10">
+                  <tr>
+                    <th className="px-4 py-2">Mã đơn</th>
+                    <th className="px-4 py-2">Ngày giờ</th>
+                    <th className="px-4 py-2">Khách hàng</th>
+                    <th className="px-4 py-2 text-right">Tổng tiền</th>
+                    <th className="px-4 py-2 text-center w-32">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {orders.map(o => (
+                    <tr key={o.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-2 font-mono font-bold text-indigo-600 text-[0.8rem]">{o.id}</td>
+                      <td className="px-4 py-2 text-[0.8rem] text-slate-500">{new Date(o.date).toLocaleString('vi-VN')}</td>
+                      <td className="px-4 py-2 font-bold text-slate-700 truncate text-[0.85rem]">{contacts.find(c => c.id === o.customerId)?.name || 'Khách lẻ'}</td>
+                      <td className="px-4 py-2 text-right font-bold text-[0.85rem]">{o.total.toLocaleString()} đ</td>
+                      <td className="px-4 py-2 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => setViewingOrder(o)} title="Xem chi tiết" className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Eye size={16} /></button>
+                          <button onClick={() => handleEditOrder(o)} title="Chỉnh sửa" className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Edit size={16} /></button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {orders.map(o => (
-                      <tr key={o.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-2 font-mono font-bold text-indigo-600 text-[0.8rem]">{o.id}</td>
-                        <td className="px-4 py-2 text-[0.8rem] text-slate-500">{new Date(o.date).toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 font-bold text-slate-700 truncate text-[0.85rem]">{contacts.find(c => c.id === o.customerId)?.name || 'Khách lẻ'}</td>
-                        <td className="px-4 py-2 text-right font-bold text-[0.85rem]">{o.total.toLocaleString()} đ</td>
-                        <td className="px-4 py-2 text-center">
-                           <div className="flex items-center justify-center gap-2">
-                              <button onClick={() => setViewingOrder(o)} title="Xem chi tiết" className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Eye size={16}/></button>
-                              <button onClick={() => handleEditOrder(o)} title="Chỉnh sửa" className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Edit size={16}/></button>
-                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-               </table>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

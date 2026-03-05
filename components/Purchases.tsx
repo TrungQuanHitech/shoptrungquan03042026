@@ -19,12 +19,12 @@ interface PurchasesProps {
 const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases, setPurchases, contacts, setContacts, transactions, setTransactions, settings, onNotify }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
-  const [purchaseItems, setPurchaseItems] = useState<{product: Product, quantity: number, cost: number}[]>([]);
+  const [purchaseItems, setPurchaseItems] = useState<{ product: Product, quantity: number, cost: number }[]>([]);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [showHistory, setShowHistory] = useState(false);
   const [viewingPurchase, setViewingPurchase] = useState<Purchase | null>(null);
   const [currentTaxRate, setCurrentTaxRate] = useState<number>(settings.taxRate);
-  
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null);
 
@@ -40,9 +40,9 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
   }, [settings.taxRate, isEditMode]);
 
   const suppliers = useMemo(() => contacts.filter(c => c.type === 'SUPPLIER'), [contacts]);
-  const filteredProducts = useMemo(() => 
-    products.filter(p => 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredProducts = useMemo(() =>
+    products.filter(p =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchTerm.toLowerCase())
     ), [products, searchTerm]);
 
@@ -62,8 +62,8 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
     const newProduct: Product = {
       id: 'p-' + Date.now(),
       name: quickName,
-      sku: 'NK-' + Math.floor(Math.random()*1000),
-      stock: 0, cost: quickCost, price: quickCost * 1.2, 
+      sku: 'NK-' + Math.floor(Math.random() * 1000),
+      stock: 0, cost: quickCost, price: quickCost * 1.2,
       imageUrl: `https://picsum.photos/seed/${Date.now()}/200/200`
     };
     setProducts(prev => [newProduct, ...prev]);
@@ -97,10 +97,10 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
     const y = String(now.getFullYear()).slice(-2);
     const datePart = `${d}${m}${y}`;
     const prefixStr = `NH-${datePart}`;
-    
+
     const todayPurchases = purchases.filter(p => p.id && p.id.startsWith(prefixStr));
     let nextNum = 1;
-    
+
     if (todayPurchases.length > 0) {
       const suffixes = todayPurchases.map(p => {
         const numPart = p.id.slice(prefixStr.length);
@@ -109,10 +109,10 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
       });
       nextNum = Math.max(...suffixes, 0) + 1;
     }
-    
+
     return `${prefixStr}${String(nextNum).padStart(3, '0')}`;
   };
-  
+
   const handleSave = () => {
     if (!selectedSupplierId) {
       alert('Vui lòng chọn Nhà cung cấp!');
@@ -125,22 +125,22 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
 
     // --- REVERT PHASE (only if editing) ---
     if (isEditMode && editingPurchaseId) {
-        const originalPurchase = purchases.find(p => p.id === editingPurchaseId);
-        if (originalPurchase) {
-            // 1. Revert stock
-            setProducts(prev => prev.map(p => {
-                const itemInOld = originalPurchase.items.find(i => i.productId === p.id);
-                return itemInOld ? { ...p, stock: Math.max(0, p.stock - itemInOld.quantity) } : p;
-            }));
-            // 2. Revert debt
-            if (originalPurchase.debt > 0 && originalPurchase.supplierId) {
-                setContacts(prev => prev.map(c => 
-                    c.id === originalPurchase.supplierId ? { ...c, debt: Math.max(0, c.debt - originalPurchase.debt) } : c
-                ));
-            }
-            // 3. Revert transactions
-            setTransactions(prev => prev.filter(t => t.relatedId !== editingPurchaseId));
+      const originalPurchase = purchases.find(p => p.id === editingPurchaseId);
+      if (originalPurchase) {
+        // 1. Revert stock
+        setProducts(prev => prev.map(p => {
+          const itemInOld = originalPurchase.items.find(i => i.productId === p.id);
+          return itemInOld ? { ...p, stock: Math.max(0, p.stock - itemInOld.quantity) } : p;
+        }));
+        // 2. Revert debt
+        if (originalPurchase.debt > 0 && originalPurchase.supplierId) {
+          setContacts(prev => prev.map(c =>
+            c.id === originalPurchase.supplierId ? { ...c, debt: Math.max(0, c.debt - originalPurchase.debt) } : c
+          ));
         }
+        // 3. Revert transactions
+        setTransactions(prev => prev.filter(t => t.relatedId !== editingPurchaseId));
+      }
     }
 
     // --- APPLY PHASE (for new and edited) ---
@@ -178,20 +178,20 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
 
     // 3. Apply new debt
     if (newPurchase.debt > 0 && newPurchase.supplierId) {
-      setContacts(prev => prev.map(c => 
+      setContacts(prev => prev.map(c =>
         c.id === newPurchase.supplierId ? { ...c, debt: (c.debt || 0) + newPurchase.debt } : c
       ));
     }
 
     // 4. Save purchase (add new or replace existing)
     setPurchases(prev => {
-        const existing = prev.find(p => p.id === purchaseId);
-        if (existing) {
-            return prev.map(p => p.id === purchaseId ? newPurchase : p);
-        }
-        return [newPurchase, ...prev];
+      const existing = prev.find(p => p.id === purchaseId);
+      if (existing) {
+        return prev.map(p => p.id === purchaseId ? newPurchase : p);
+      }
+      return [newPurchase, ...prev];
     });
-    
+
     // --- FINALIZATION ---
     if (settings.notifyOnPurchase && onNotify) {
       const supplier = contacts.find(c => c.id === selectedSupplierId)?.name || 'N/A';
@@ -200,7 +200,7 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
       const text = `🚚 <b>${action}: ${purchaseId}</b>\n━━━━━━━━━━━━━\n🏢 <b>NCC:</b> ${supplier}\n📦 <b>Hàng hóa:</b>\n${itemsList}\n━━━━━━━━━━━━━\n💰 <b>Tổng chi: ${totalCost.toLocaleString()}đ</b>\n✅ <b>Đã trả:</b> ${paidAmount.toLocaleString()}đ\n⚠️ <b>Nợ NCC:</b> ${newPurchase.debt.toLocaleString()}đ`;
       onNotify(text);
     }
-    
+
     // Reset UI state
     setPurchaseItems([]);
     setSelectedSupplierId('');
@@ -216,12 +216,12 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
     setSelectedSupplierId(purchase.supplierId);
     setCurrentTaxRate(purchase.taxRate || 0);
     setPaidAmount(purchase.paid);
-    
+
     const restoredItems = purchase.items.map(item => {
       const product = products.find(p => p.id === item.productId);
       return product ? { product, quantity: item.quantity, cost: item.cost } : null;
-    }).filter(i => i !== null) as {product: Product, quantity: number, cost: number}[];
-    
+    }).filter(i => i !== null) as { product: Product, quantity: number, cost: number }[];
+
     setPurchaseItems(restoredItems);
     setShowHistory(false);
   };
@@ -304,15 +304,15 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
                   </td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-1 mb-0.5">
-                       <span className="text-[8px] text-slate-400 uppercase font-bold">Vốn:</span>
-                       <input 
-                        type="number" 
-                        value={item.cost} 
+                      <span className="text-[8px] text-slate-400 uppercase font-bold">Giá nhập:</span>
+                      <input
+                        type="number"
+                        value={item.cost}
                         onChange={(e) => updateItem(item.product.id, 'cost', Number(e.target.value))}
-                        className="w-16 text-right text-orange-600 font-bold text-[0.8rem] border-b border-transparent hover:border-slate-200 outline-none focus:border-orange-300" 
-                       />
+                        className="w-20 text-right text-orange-600 font-bold text-[0.8rem] border-b border-transparent hover:border-slate-200 outline-none focus:border-orange-300 bg-transparent"
+                      />
                     </div>
-                    <div className="font-bold text-slate-900 text-[0.85rem]">{(item.cost * item.quantity).toLocaleString()}</div>
+                    <div className="font-bold text-slate-900 text-[0.85rem]">{(item.cost * item.quantity).toLocaleString()} đ</div>
                   </td>
                   <td className="px-1 py-2">
                     <button onClick={() => removeFromCart(item.product.id)} className="text-slate-300 hover:text-rose-500"><X size={14} /></button>
@@ -339,11 +339,11 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
               <span className="text-orange-600 text-[1.1rem] leading-none">{totalCost.toLocaleString()} đ</span>
             </div>
           </div>
-          
+
           <div className="space-y-1">
             <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Nhà cung cấp</label>
-            <select 
-              value={selectedSupplierId} 
+            <select
+              value={selectedSupplierId}
               onChange={(e) => setSelectedSupplierId(e.target.value)}
               className="w-full p-2 border border-slate-200 rounded-lg font-bold text-[0.85rem] bg-white focus:ring-2 focus:ring-orange-200 outline-none"
             >
@@ -354,15 +354,15 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
 
           <div className="space-y-1">
             <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Số tiền đã trả</label>
-            <input 
-              type="number" 
-              value={paidAmount} 
+            <input
+              type="number"
+              value={paidAmount}
               onChange={(e) => setPaidAmount(Number(e.target.value))}
               className="w-full px-3 py-2 border-2 border-slate-200 rounded-xl font-bold text-emerald-600 text-[1.2rem] outline-none focus:border-emerald-400 bg-white"
             />
           </div>
 
-          <button 
+          <button
             disabled={purchaseItems.length === 0}
             onClick={handleSave}
             className={`w-full py-3 rounded-xl font-bold text-white uppercase tracking-wider flex items-center justify-center gap-2 text-[0.8rem] shadow-lg active:scale-95 transition-all ${purchaseItems.length === 0 ? 'bg-slate-300' : 'bg-orange-600'}`}
@@ -374,114 +374,114 @@ const Purchases: React.FC<PurchasesProps> = ({ products, setProducts, purchases,
 
       {isQuickModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-[90] flex items-center justify-center p-4 backdrop-blur-sm">
-           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 animate-in zoom-in duration-200">
-              <h3 className="font-bold text-slate-700 uppercase mb-4 text-[0.85rem]">Tạo nhanh sản phẩm</h3>
-              <div className="space-y-4">
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Tên sản phẩm</label>
-                    <input autoFocus value={quickName} onChange={e => setQuickName(e.target.value)} placeholder="VD: Màn hình Dell..." className="w-full p-2.5 border border-slate-200 rounded-xl text-[0.9rem] font-bold" />
-                 </div>
-                 <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                       <label className="text-[10px] font-bold text-slate-400 uppercase">Số lượng</label>
-                       <input type="number" value={quickQty} onChange={e => setQuickQty(Number(e.target.value))} className="w-full p-2.5 border border-slate-200 rounded-xl text-[0.9rem] font-bold" />
-                    </div>
-                    <div className="space-y-1">
-                       <label className="text-[10px] font-bold text-slate-400 uppercase">Giá vốn</label>
-                       <input type="number" value={quickCost} onChange={e => setQuickCost(Number(e.target.value))} className="w-full p-2.5 border border-slate-200 rounded-xl text-[0.9rem] font-bold text-orange-600" />
-                    </div>
-                 </div>
-                 <div className="flex gap-2 pt-2">
-                    <button onClick={() => setIsQuickModalOpen(false)} className="flex-1 py-2.5 bg-slate-50 text-slate-400 rounded-xl font-bold text-[0.8rem] uppercase">Hủy</button>
-                    <button onClick={handleQuickAdd} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-[0.8rem] uppercase shadow-md active:scale-95 transition-all">Thêm ngay</button>
-                 </div>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 animate-in zoom-in duration-200">
+            <h3 className="font-bold text-slate-700 uppercase mb-4 text-[0.85rem]">Tạo nhanh sản phẩm</h3>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Tên sản phẩm</label>
+                <input autoFocus value={quickName} onChange={e => setQuickName(e.target.value)} placeholder="VD: Màn hình Dell..." className="w-full p-2.5 border border-slate-200 rounded-xl text-[0.9rem] font-bold" />
               </div>
-           </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Số lượng</label>
+                  <input type="number" value={quickQty} onChange={e => setQuickQty(Number(e.target.value))} className="w-full p-2.5 border border-slate-200 rounded-xl text-[0.9rem] font-bold" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Giá vốn</label>
+                  <input type="number" value={quickCost} onChange={e => setQuickCost(Number(e.target.value))} className="w-full p-2.5 border border-slate-200 rounded-xl text-[0.9rem] font-bold text-orange-600" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setIsQuickModalOpen(false)} className="flex-1 py-2.5 bg-slate-50 text-slate-400 rounded-xl font-bold text-[0.8rem] uppercase">Hủy</button>
+                <button onClick={handleQuickAdd} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-[0.8rem] uppercase shadow-md active:scale-95 transition-all">Thêm ngay</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {showHistory && (
         <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-3 backdrop-blur-sm animate-in fade-in duration-200 no-print">
-           <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
-              <div className="px-4 py-3 border-b flex items-center justify-between bg-slate-50">
-                 <h3 className="font-bold text-slate-700 uppercase text-[0.85rem] tracking-tight">Lịch sử phiếu nhập</h3>
-                 <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600 p-1"><X size={20} /></button>
-              </div>
-              <div className="flex-1 overflow-auto">
-                 <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-[9px] font-bold text-slate-400 uppercase sticky top-0 border-b border-slate-200 z-10">
-                       <tr>
-                          <th className="px-4 py-2">Mã phiếu</th>
-                          <th className="px-4 py-2">Ngày</th>
-                          <th className="px-4 py-2">Nhà cung cấp</th>
-                          <th className="px-4 py-2 text-right">Tổng chi</th>
-                          <th className="px-4 py-2 text-center w-24">Thao tác</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                       {purchases.map(p => (
-                           <tr key={p.id} className="hover:bg-slate-50 transition-colors text-[0.85rem]">
-                              <td className="px-4 py-2 font-mono font-bold text-orange-600 text-[0.8rem]">{p.id}</td>
-                              <td className="px-4 py-2 text-slate-400 text-[0.8rem]">{new Date(p.date).toLocaleDateString()}</td>
-                              <td className="px-4 py-2 font-bold text-slate-700">{contacts.find(c => c.id === p.supplierId)?.name || 'N/A'}</td>
-                              <td className="px-4 py-2 text-right font-bold text-slate-900">{p.total.toLocaleString()}</td>
-                              <td className="px-4 py-2 text-center flex justify-center gap-1">
-                                 <button onClick={() => setViewingPurchase(p)} className="p-1.5 text-slate-400 hover:text-indigo-600" title="Xem"><Eye size={16} /></button>
-                                 <button onClick={() => startEditPurchase(p)} className="p-1.5 text-slate-400 hover:text-orange-600" title="Sửa"><Edit size={16} /></button>
-                              </td>
-                           </tr>
-                       ))}
-                    </tbody>
-                 </table>
-              </div>
-           </div>
+          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
+            <div className="px-4 py-3 border-b flex items-center justify-between bg-slate-50">
+              <h3 className="font-bold text-slate-700 uppercase text-[0.85rem] tracking-tight">Lịch sử phiếu nhập</h3>
+              <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600 p-1"><X size={20} /></button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 text-[9px] font-bold text-slate-400 uppercase sticky top-0 border-b border-slate-200 z-10">
+                  <tr>
+                    <th className="px-4 py-2">Mã phiếu</th>
+                    <th className="px-4 py-2">Ngày</th>
+                    <th className="px-4 py-2">Nhà cung cấp</th>
+                    <th className="px-4 py-2 text-right">Tổng chi</th>
+                    <th className="px-4 py-2 text-center w-24">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {purchases.map(p => (
+                    <tr key={p.id} className="hover:bg-slate-50 transition-colors text-[0.85rem]">
+                      <td className="px-4 py-2 font-mono font-bold text-orange-600 text-[0.8rem]">{p.id}</td>
+                      <td className="px-4 py-2 text-slate-400 text-[0.8rem]">{new Date(p.date).toLocaleDateString()}</td>
+                      <td className="px-4 py-2 font-bold text-slate-700">{contacts.find(c => c.id === p.supplierId)?.name || 'N/A'}</td>
+                      <td className="px-4 py-2 text-right font-bold text-slate-900">{p.total.toLocaleString()}</td>
+                      <td className="px-4 py-2 text-center flex justify-center gap-1">
+                        <button onClick={() => setViewingPurchase(p)} className="p-1.5 text-slate-400 hover:text-indigo-600" title="Xem"><Eye size={16} /></button>
+                        <button onClick={() => startEditPurchase(p)} className="p-1.5 text-slate-400 hover:text-orange-600" title="Sửa"><Edit size={16} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
       {viewingPurchase && (
-         <>
-            <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm no-print">
-               <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
-                  <div className="px-4 py-3 border-b flex items-center justify-between bg-slate-50">
-                     <h3 className="font-bold text-slate-700 uppercase text-[0.9rem]">Phiếu nhập: {viewingPurchase.id}</h3>
-                     <button onClick={() => setViewingPurchase(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-                  </div>
-                  <div className="flex-1 overflow-auto p-4 space-y-4">
-                     <table className="w-full text-[0.85rem] text-left border-collapse">
-                        <thead className="bg-slate-50 text-[9px] font-bold uppercase border-b border-slate-100">
-                           <tr>
-                              <th className="py-2">Sản phẩm</th>
-                              <th className="py-2 text-center">SL</th>
-                              <th className="py-2 text-right">Giá nhập</th>
-                              <th className="py-2 text-right">T.Tiền</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                           {viewingPurchase.items.map((item, idx) => {
-                              const prod = products.find(p => p.id === item.productId);
-                              return (
-                                 <tr key={idx}>
-                                    <td className="py-2 font-medium text-slate-700">{prod?.name || 'SP đã xóa'}</td>
-                                    <td className="py-2 text-center font-bold text-slate-500">{item.quantity}</td>
-                                    <td className="py-2 text-right text-slate-500">{item.cost.toLocaleString()}</td>
-                                    <td className="py-2 text-right font-bold text-slate-800">{(item.cost * item.quantity).toLocaleString()}</td>
-                                 </tr>
-                              )
-                           })}
-                        </tbody>
-                     </table>
-                     <div className="border-t border-slate-100 pt-3 space-y-1 text-[0.85rem]">
-                        <div className="flex justify-between font-bold text-orange-600 text-lg"><span>Tổng cộng:</span><span>{viewingPurchase.total.toLocaleString()} đ</span></div>
-                        <div className="flex justify-between"><span>Đã trả:</span><span className="font-bold text-emerald-600">{viewingPurchase.paid.toLocaleString()}</span></div>
-                        <div className="flex justify-between"><span>Nợ NCC:</span><span className="font-bold text-rose-600">{viewingPurchase.debt.toLocaleString()}</span></div>
-                     </div>
-                  </div>
-                  <div className="p-3 border-t bg-slate-50 flex gap-2">
-                     <button onClick={() => setViewingPurchase(null)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold uppercase text-[0.8rem]">Đóng</button>
-                  </div>
-               </div>
+        <>
+          <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm no-print">
+            <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl flex flex-col border border-slate-200">
+              <div className="px-4 py-3 border-b flex items-center justify-between bg-slate-50">
+                <h3 className="font-bold text-slate-700 uppercase text-[0.9rem]">Phiếu nhập: {viewingPurchase.id}</h3>
+                <button onClick={() => setViewingPurchase(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+              </div>
+              <div className="flex-1 overflow-auto p-4 space-y-4">
+                <table className="w-full text-[0.85rem] text-left border-collapse">
+                  <thead className="bg-slate-50 text-[9px] font-bold uppercase border-b border-slate-100">
+                    <tr>
+                      <th className="py-2">Sản phẩm</th>
+                      <th className="py-2 text-center">SL</th>
+                      <th className="py-2 text-right">Giá nhập</th>
+                      <th className="py-2 text-right">T.Tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {viewingPurchase.items.map((item, idx) => {
+                      const prod = products.find(p => p.id === item.productId);
+                      return (
+                        <tr key={idx}>
+                          <td className="py-2 font-medium text-slate-700">{prod?.name || 'SP đã xóa'}</td>
+                          <td className="py-2 text-center font-bold text-slate-500">{item.quantity}</td>
+                          <td className="py-2 text-right text-slate-500">{item.cost.toLocaleString()}</td>
+                          <td className="py-2 text-right font-bold text-slate-800">{(item.cost * item.quantity).toLocaleString()}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                <div className="border-t border-slate-100 pt-3 space-y-1 text-[0.85rem]">
+                  <div className="flex justify-between font-bold text-orange-600 text-lg"><span>Tổng cộng:</span><span>{viewingPurchase.total.toLocaleString()} đ</span></div>
+                  <div className="flex justify-between"><span>Đã trả:</span><span className="font-bold text-emerald-600">{viewingPurchase.paid.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>Nợ NCC:</span><span className="font-bold text-rose-600">{viewingPurchase.debt.toLocaleString()}</span></div>
+                </div>
+              </div>
+              <div className="p-3 border-t bg-slate-50 flex gap-2">
+                <button onClick={() => setViewingPurchase(null)} className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold uppercase text-[0.8rem]">Đóng</button>
+              </div>
             </div>
-         </>
+          </div>
+        </>
       )}
     </div>
   );
