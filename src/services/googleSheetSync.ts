@@ -311,3 +311,55 @@ export const syncToGoogleSheetDirect = async (
 
   return { success: true };
 };
+
+export const clearGoogleSheetData = async (
+  settings: Settings,
+  onTokenRefreshed?: (newToken: string, newExpiry: number) => void
+) => {
+  let token = settings.googleAccessToken;
+  if (!token) throw new Error("Chưa kết nối Google.");
+
+  const spreadsheetId = settings.googleSheetId;
+  if (!spreadsheetId) throw new Error("Vui lòng tạo hoặc nhập Google Sheet ID.");
+
+  const sheetHeaders = {
+    PRODUCTS: ['MÃ SP', 'TÊN SẢN PHẨM', 'DANH MỤC', 'SKU', 'GIÁ VỐN', 'GIÁ BÁN', 'TỒN KHO', 'GIÁ TRỊ TỒN', 'MÔ TẢ'],
+    SALES: ['MÃ ĐƠN', 'NGÀY', 'KHÁCH HÀNG', 'TỔNG CỘNG', 'ĐÃ THANH TOÁN', 'CÒN NỢ', 'THUẾ', 'CHI TIẾT'],
+    PURCHASES: ['MÃ NHẬP', 'NGÀY', 'NHÀ CUNG CẤP', 'TỔNG CỘNG', 'ĐÃ THANH TOÁN', 'CÒN NỢ', 'THUẾ', 'CHI TIẾT'],
+    CONTACTS: ['MÃ ĐT', 'TÊN', 'SỐ ĐIỆN THOẠI', 'LOẠI', 'CÔNG NỢ'],
+    CASHFLOW: ['MÃ GD', 'NGÀY', 'LOẠI', 'SỐ TIỀN', 'MÔ TẢ', 'DANH MỤC', 'LIÊN QUAN'],
+    SERVICES: ['MÃ DV', 'LOẠI', 'KHÁCH HÀNG', 'THIẾT BỊ/MÁY', 'TRẠNG THÁI', 'CHI PHÍ/GIÁ THUÊ', 'GHI CHÚ']
+  };
+
+  for (const [sheetName, headers] of Object.entries(sheetHeaders)) {
+    // 1. Clear the entire sheet content first
+    const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1:Z2000:clear`;
+    const clearOptions: RequestInit = {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    };
+
+    await apiFetch(clearUrl, clearOptions, settings, (newToken, newExpiry) => {
+      token = newToken;
+      if (onTokenRefreshed) onTokenRefreshed(newToken, newExpiry);
+    });
+
+    // 2. Put headers back at row 1
+    const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}!A1?valueInputOption=USER_ENTERED`;
+    const updateOptions: RequestInit = {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ values: [headers], majorDimension: 'ROWS' }),
+    };
+
+    await apiFetch(updateUrl, updateOptions, settings, (newToken, newExpiry) => {
+      token = newToken;
+      if (onTokenRefreshed) onTokenRefreshed(newToken, newExpiry);
+    });
+  }
+
+  return { success: true };
+};

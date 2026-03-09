@@ -289,3 +289,32 @@ export const pullSettingsFromSupabase = async (settings: Settings): Promise<Part
         return null;
     }
 };
+
+export const clearSupabaseData = async (settings: Settings): Promise<boolean> => {
+    const supabase = getSupabaseClient(settings);
+    if (!supabase) return false;
+
+    try {
+        const tables = [
+            'products',
+            'orders',
+            'purchases',
+            'transactions',
+            'contacts',
+            'repair_tickets',
+            'rental_contracts'
+        ];
+
+        // Delete all rows from each table
+        // Note: Using a condition that is always true for IDs (assuming UUID or non-zero strings)
+        const deletePromises = tables.map(table => 
+            supabase.from(table).delete().neq('id', '0')
+        );
+
+        await Promise.all(deletePromises);
+        return true;
+    } catch (error) {
+        console.error("Supabase Clear Data Error:", error);
+        return false;
+    }
+};

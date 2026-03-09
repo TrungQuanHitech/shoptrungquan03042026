@@ -17,7 +17,8 @@ import Reports from './components/Reports';
 import SettingsView from './components/SettingsView';
 import Services from './components/Services';
 import Chatbot from './components/Chatbot';
-import { pullFromSupabase, pushToSupabase } from './src/services/supabaseSync';
+import { pullFromSupabase, pushToSupabase, clearSupabaseData } from './src/services/supabaseSync';
+import { clearGoogleSheetData } from './src/services/googleSheetSync';
 
 const getTodayPrefix = () => {
   const now = new Date();
@@ -359,25 +360,46 @@ const App: React.FC = () => {
     }
   }, [prefix]);
 
-  const clearAllData = useCallback(() => {
-    if (window.confirm("HÀNH ĐỘNG NÀY SẼ XÓA TOÀN BỘ DỮ LIỆU VÀ CẤU HÌNH. Bạn có chắc chắn muốn reset toàn bộ hệ thống?")) {
-      // Clear all state
-      setProducts([]);
-      setOrders([]);
-      setPurchases([]);
-      setTransactions([]);
-      setContacts([]);
-      setRepairTickets([]);
-      setRentalContracts([]);
-      setSettings(INITIAL_SETTINGS);
+  const clearAllData = useCallback(async () => {
+    if (window.confirm("🔔 HÀNH ĐỘNG NÀY SẼ XÓA TOÀN BỘ DỮ LIỆU (Sản phẩm, Đơn hàng, Thu chi, Dịch vụ...) trên thiết bị này và đồng bộ xóa trên Cloud (Supabase/Google Sheets).\n\n⚠️ Cấu hình hệ thống (Tên shop, Token, API Key...) sẽ được GIỮ LẠI.\n\nBạn có chắc chắn muốn thực hiện?")) {
+      try {
+        // 1. Reset Web State
+        setProducts([]);
+        setOrders([]);
+        setPurchases([]);
+        setTransactions([]);
+        setContacts([]);
+        setRepairTickets([]);
+        setRentalContracts([]);
 
-      // Clear all localStorage
-      localStorage.clear();
+        // 2. Clear LocalStorage (except settings)
+        const dataKeys = [
+          'erp_products', 'erp_orders', 'erp_purchases', 
+          'erp_transactions', 'erp_contacts', 'erp_repair_tickets', 
+          'erp_rental_contracts'
+        ];
+        dataKeys.forEach(key => localStorage.removeItem(key));
 
-      alert("✅ Hệ thống đã được reset về trạng thái ban đầu!");
-      window.location.reload(); // Force reload to ensure clean state
+        // 3. Clear Supabase if connected
+        if (settings.isSupabaseConnected) {
+          console.log("Resetting Supabase data...");
+          await clearSupabaseData(settings);
+        }
+
+        // 4. Clear Google Sheets if connected
+        if (settings.isGoogleConnected && settings.googleAccessToken && settings.googleSheetId) {
+          console.log("Resetting Google Sheets data...");
+          await clearGoogleSheetData(settings);
+        }
+
+        alert("✅ Hệ thống đã được xóa sạch dữ liệu và đồng bộ lên Cloud thành công!");
+        window.location.reload(); // Reload to ensure clean state
+      } catch (error: any) {
+        console.error("Reset Error:", error);
+        alert(`🔴 Lỗi khi reset dữ liệu: ${error.message}`);
+      }
     }
-  }, []);
+  }, [settings]);
 
   const notifyTelegram = useCallback(async (
     payload: string | { file: Blob; caption: string; filename: string }
