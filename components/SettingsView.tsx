@@ -4,7 +4,7 @@ import { Save, MapPin, CreditCard, Database, MessageSquare, Table, Send, CheckCi
 import { Settings, Product, Order, Purchase, Contact, Transaction, RepairTicket, RentalContract } from '../types';
 import { syncToGoogleSheet, syncToGoogleSheetDirect, createSpreadsheet, createDriveFolder, createSheetTab } from '../src/services/googleSheetSync';
 import { signInWithGoogle, signOutGoogle, getValidToken } from '../src/services/googleIdentity';
-import { pushToSupabase, pullFromSupabase } from '../src/services/supabaseSync';
+import { pushToSupabase, pullFromSupabase, pushSettingsToSupabase } from '../src/services/supabaseSync';
 import { verifySupabaseConnection } from '../src/services/supabaseClient';
 import * as XLSX from 'xlsx';
 
@@ -290,10 +290,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSettings(localSettings);
     localStorage.setItem('erp_settings', JSON.stringify(localSettings));
+    
+    // Đồng bộ lên Supabase nếu đã kết nối
+    if (localSettings.isSupabaseConnected) {
+      const success = await pushSettingsToSupabase(localSettings);
+      if (success) {
+        console.log("Settings synced to Supabase successfully.");
+      } else {
+        alert("⚠️ Cấu hình đã được lưu cục bộ nhưng không thể đồng bộ lên Supabase Cloud.");
+      }
+    }
+
     setIsSaved(true);
     alert('✅ Đã lưu cấu hình hệ thống thành công!');
   };

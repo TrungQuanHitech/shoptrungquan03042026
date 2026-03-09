@@ -11,23 +11,36 @@ export interface SyncData {
     rentalContracts: RentalContract[];
 }
 
+export const pushSettingsToSupabase = async (settings: Settings): Promise<boolean> => {
+    const supabase = getSupabaseClient(settings);
+    if (!supabase) return false;
+
+    try {
+        const safeSettings = { ...settings };
+        delete (safeSettings as any).googleAccessToken;
+        delete (safeSettings as any).supabaseAnonKey;
+        delete (safeSettings as any).groqApiKey;
+
+        const { error } = await supabase.from('app_settings').upsert({
+            id: 'default',
+            settings: safeSettings,
+            updated_at: new Date().toISOString()
+        });
+
+        return !error;
+    } catch (error) {
+        console.error("Supabase Push Settings Error:", error);
+        return false;
+    }
+};
+
 export const pushToSupabase = async (settings: Settings, data: SyncData): Promise<boolean> => {
     const supabase = getSupabaseClient(settings);
     if (!supabase) return false;
 
     try {
         // 1. App Settings
-        // Lưu các biến môi trường không nhạy cảm (bỏ accessToken và keys)
-        const safeSettings = { ...settings };
-        delete safeSettings.googleAccessToken;
-        delete safeSettings.supabaseAnonKey;
-        delete safeSettings.groqApiKey;
-
-        await supabase.from('app_settings').upsert({
-            id: 'default',
-            settings: safeSettings,
-            updated_at: new Date().toISOString()
-        });
+        await pushSettingsToSupabase(settings);
 
         // 2. Products
         if (data.products.length > 0) {

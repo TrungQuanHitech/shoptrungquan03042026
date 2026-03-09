@@ -17,7 +17,7 @@ import Reports from './components/Reports';
 import SettingsView from './components/SettingsView';
 import Services from './components/Services';
 import Chatbot from './components/Chatbot';
-import { pullFromSupabase, pushToSupabase, clearSupabaseData } from './src/services/supabaseSync';
+import { pullFromSupabase, pushToSupabase, clearSupabaseData, pullSettingsFromSupabase } from './src/services/supabaseSync';
 import { clearGoogleSheetData } from './src/services/googleSheetSync';
 
 const getTodayPrefix = () => {
@@ -192,8 +192,20 @@ const App: React.FC = () => {
   // Background Pull on Startup
   useEffect(() => {
     const initData = async () => {
+      // Nếu có thông tin kết nối Supabase (từ env hoặc settings)
       if (settings.isSupabaseConnected) {
-        console.log("Supabase: Background pulling data...");
+        console.log("Supabase: Khởi chạy đồng bộ từ Cloud...");
+        
+        // 1. Ưu tiên kéo Cấu hình (Settings) trước
+        const cloudSettings = await pullSettingsFromSupabase(settings);
+        if (cloudSettings) {
+          console.log("Supabase: Đã tải cấu hình từ Cloud.");
+          setSettings(prev => ({ ...prev, ...cloudSettings }));
+          // Lưu lại localStorage để các tab khác/lần sau dùng luôn
+          localStorage.setItem('erp_settings', JSON.stringify({ ...settings, ...cloudSettings }));
+        }
+
+        // 2. Kéo toàn bộ dữ liệu nghiệp vụ
         const data = await pullFromSupabase(settings);
         if (data) {
           if (data.products) setProducts(data.products as Product[]);
@@ -203,12 +215,12 @@ const App: React.FC = () => {
           if (data.contacts) setContacts(data.contacts as Contact[]);
           if (data.repairTickets) setRepairTickets(data.repairTickets as RepairTicket[]);
           if (data.rentalContracts) setRentalContracts(data.rentalContracts as RentalContract[]);
-          console.log("Supabase: Background pull complete.");
+          console.log("Supabase: Đã tải toàn bộ dữ liệu nghiệp vụ từ Cloud.");
         }
       }
     };
     initData();
-  }, [settings.isSupabaseConnected]); // Only runs once on mount or when connection toggled
+  }, [settings.isSupabaseConnected]);
 
   // Auto-sync (Push) to Supabase debounced
   useEffect(() => {
